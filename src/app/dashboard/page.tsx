@@ -4,12 +4,13 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { CheckCircle2, Truck, XCircle, Package, FileDown, Loader2 } from 'lucide-react';
+import { CheckCircle2, Truck, XCircle, Package } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useGuias, useRegistrarGuia } from '@/hooks/useGuias';
 import { KPICard } from '@/components/features/dashboard/KPICard';
+import { PdfDownloadPanel } from '@/components/features/dashboard/PdfDownloadPanel';
 import { extractApiErrorMessage } from '@/utils/format';
-import { QUERY_KEYS, API_URL } from '@/lib/constants';
+import { QUERY_KEYS } from '@/lib/constants';
 import type { GuiaResumen } from '@/types';
 
 const EN_RUTA = new Set(['registrado', 'recogido', 'en_transito', 'en_ruta_entrega']);
@@ -54,39 +55,6 @@ export default function DashboardPage() {
   const { data, isLoading } = useGuias({ page_size: 200 });
   const { mutateAsync, isPending } = useRegistrarGuia();
   const [apiError, setApiError] = useState<string | null>(null);
-  const [pdfLoading, setPdfLoading] = useState(false);
-  const [pdfError, setPdfError] = useState<string | null>(null);
-
-  const today = new Date().toISOString().split('T')[0];
-  const [fechaInicio, setFechaInicio] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 14);
-    return d.toISOString().split('T')[0];
-  });
-  const [fechaFin, setFechaFin] = useState(today);
-
-  async function descargarPdf() {
-    setPdfLoading(true);
-    setPdfError(null);
-    try {
-      const url = `${API_URL}/reports/range?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`;
-      const res = await fetch(url);
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || `Error ${res.status}`);
-      }
-      const blob = await res.blob();
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `informe_tcc_${fechaInicio}_al_${fechaFin}.pdf`;
-      a.click();
-      URL.revokeObjectURL(a.href);
-    } catch (err: any) {
-      setPdfError(err.message || 'Error al generar el PDF');
-    } finally {
-      setPdfLoading(false);
-    }
-  }
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -183,47 +151,7 @@ export default function DashboardPage() {
           </form>
         </div>
 
-        {/* Descarga PDF */}
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center gap-2 mb-4">
-            <FileDown className="h-4 w-4 text-blue-600" />
-            <h2 className="text-sm font-semibold text-gray-900">Descargar informe PDF</h2>
-          </div>
-          <div className="flex flex-wrap items-end gap-4">
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-gray-700">Fecha inicio</label>
-              <input
-                type="date"
-                value={fechaInicio}
-                max={fechaFin}
-                onChange={e => setFechaInicio(e.target.value)}
-                className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-gray-700">Fecha fin</label>
-              <input
-                type="date"
-                value={fechaFin}
-                min={fechaInicio}
-                max={today}
-                onChange={e => setFechaFin(e.target.value)}
-                className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
-              />
-            </div>
-            <button
-              onClick={descargarPdf}
-              disabled={pdfLoading}
-              className="flex items-center gap-2 rounded-md bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-            >
-              {pdfLoading
-                ? <><Loader2 className="h-4 w-4 animate-spin" /> Generando...</>
-                : <><FileDown className="h-4 w-4" /> Descargar PDF</>
-              }
-            </button>
-          </div>
-          {pdfError && <p className="mt-2 text-xs text-red-600">{pdfError}</p>}
-        </div>
+        <PdfDownloadPanel />
 
         {/* Tabla de guías */}
         <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
