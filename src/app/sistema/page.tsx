@@ -12,7 +12,7 @@ import { cn } from '@/utils/cn';
 
 function StatusRow({ ok, label, description }: { ok: boolean; label: string; description?: string }) {
   return (
-    <div className="flex items-start justify-between gap-4 py-3 border-b border-gray-100 last:border-0">
+    <div className="flex items-start justify-between gap-4 border-b border-gray-100 py-3 last:border-0">
       <div>
         <p className="text-sm font-medium text-gray-900">{label}</p>
         {description && <p className="text-xs text-gray-500">{description}</p>}
@@ -26,7 +26,13 @@ function StatusRow({ ok, label, description }: { ok: boolean; label: string; des
 }
 
 export default function SistemaPage() {
-  const { data, isLoading, isError, refetch } = useSystem();
+  const { data, isLoading, isError } = useSystem();
+  const schedulerDescription =
+    data?.scheduler_mode === 'external'
+      ? 'Automatizacion externa sobre el backend desplegado'
+      : data?.scheduler_mode === 'embedded'
+        ? 'Scheduler interno del backend'
+        : 'Sin scheduler residente en este deployment';
 
   const statusBadge = data
     ? {
@@ -43,12 +49,11 @@ export default function SistemaPage() {
       <div className="p-6">
         {isError && (
           <Alert variant="error" className="mb-6">
-            No se pudo conectar con el servidor. Verifica que el backend esté corriendo.
+            No se pudo conectar con el servidor. Verifica que el backend este corriendo.
           </Alert>
         )}
 
         <div className="grid gap-6 lg:grid-cols-2">
-          {/* Estado general */}
           <Card>
             <CardHeader>
               <CardTitle>Estado general</CardTitle>
@@ -65,20 +70,19 @@ export default function SistemaPage() {
               </div>
             ) : data ? (
               <div>
-                <StatusRow ok={data.bd_conectada} label="Base de datos" description="Conexión a PostgreSQL/SQLite" />
-                <StatusRow ok={data.scheduler_activo} label="Scheduler automático" description="Tareas programadas (7AM, 12PM, 4PM)" />
+                <StatusRow ok={data.bd_conectada} label="Base de datos" description="Conexion a PostgreSQL/SQLite" />
+                <StatusRow ok={data.scheduler_activo} label="Automatizacion" description={schedulerDescription} />
+                <StatusRow ok={Boolean(data.email_configured)} label="Correo saliente" description="Configuracion para enviar reportes y alertas" />
+                <StatusRow ok={Boolean(data.cron_protected)} label="Proteccion de cron" description="Validacion del disparo automatico" />
                 <StatusRow ok={data.status === 'ok'} label="API FastAPI" description="Endpoints disponibles" />
-                {data.mensaje && (
-                  <p className="mt-3 text-xs text-gray-500">{data.mensaje}</p>
-                )}
+                {data.mensaje && <p className="mt-3 text-xs text-gray-500">{data.mensaje}</p>}
               </div>
             ) : null}
           </Card>
 
-          {/* Métricas */}
           <Card>
             <CardHeader>
-              <CardTitle>Métricas</CardTitle>
+              <CardTitle>Metricas</CardTitle>
             </CardHeader>
             {isLoading ? (
               <div className="flex justify-center py-8">
@@ -91,7 +95,7 @@ export default function SistemaPage() {
                     <Server className="h-4 w-4" />
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500">Versión</p>
+                    <p className="text-xs text-gray-500">Version</p>
                     <p className="text-sm font-semibold text-gray-900">{data.version}</p>
                   </div>
                 </div>
@@ -109,7 +113,7 @@ export default function SistemaPage() {
                     <Database className="h-4 w-4" />
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500">Guías en BD</p>
+                    <p className="text-xs text-gray-500">Guias en BD</p>
                     <p className="text-sm font-semibold text-gray-900">{data.total_guias_bd}</p>
                   </div>
                 </div>
@@ -118,7 +122,7 @@ export default function SistemaPage() {
                     <Activity className="h-4 w-4" />
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500">Última consulta TCC</p>
+                    <p className="text-xs text-gray-500">Ultima consulta TCC</p>
                     <p className="text-sm font-semibold text-gray-900">
                       {formatRelative(data.ultima_consulta_tcc ?? undefined)}
                     </p>
@@ -129,10 +133,9 @@ export default function SistemaPage() {
             ) : null}
           </Card>
 
-          {/* Horarios programados */}
           <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle>Horarios de ejecución automática</CardTitle>
+              <CardTitle>Horarios de ejecucion automatica</CardTitle>
             </CardHeader>
             <div className="grid gap-4 sm:grid-cols-3">
               {['07:00 AM', '12:00 PM', '04:00 PM'].map((hora) => (

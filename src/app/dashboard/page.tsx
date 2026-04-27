@@ -4,12 +4,13 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { CheckCircle2, Truck, XCircle, Package } from 'lucide-react';
+import { CheckCircle2, Truck, XCircle, Package, Clock3 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useGuias, useRegistrarGuia } from '@/hooks/useGuias';
+import { useDashboard } from '@/hooks/useDashboard';
 import { KPICard } from '@/components/features/dashboard/KPICard';
 import { PdfDownloadPanel } from '@/components/features/dashboard/PdfDownloadPanel';
-import { extractApiErrorMessage } from '@/utils/format';
+import { extractApiErrorMessage, formatDateTime } from '@/utils/format';
 import { QUERY_KEYS } from '@/lib/constants';
 import type { GuiaResumen } from '@/types';
 
@@ -53,6 +54,7 @@ type FormValues = z.input<typeof schema>;
 export default function DashboardPage() {
   const queryClient = useQueryClient();
   const { data, isLoading } = useGuias({ page_size: 200 });
+  const { data: dashboardStats } = useDashboard();
   const { mutateAsync, isPending } = useRegistrarGuia();
   const [apiError, setApiError] = useState<string | null>(null);
 
@@ -97,6 +99,32 @@ export default function DashboardPage() {
           <KPICard title="Entregadas" value={entregadas} icon={CheckCircle2} iconClassName="bg-green-50 text-green-600" isLoading={isLoading} />
           <KPICard title="En ruta" value={enRuta} icon={Truck} iconClassName="bg-blue-50 text-blue-600" isLoading={isLoading} />
           <KPICard title="Canceladas" value={canceladas} icon={XCircle} iconClassName="bg-red-50 text-red-600" isLoading={isLoading} />
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="mb-4 flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+              <Clock3 className="h-4 w-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900">Ejecucion automatica</h2>
+              <p className="text-xs text-gray-500">Seguimiento programado 07:00, 12:00 y 16:00</p>
+            </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+              <p className="text-xs text-gray-500">Ultima ejecucion</p>
+              <p className="mt-1 text-sm font-semibold text-gray-900">
+                {dashboardStats?.ultima_ejecucion ? formatDateTime(dashboardStats.ultima_ejecucion) : 'Sin registros recientes'}
+              </p>
+            </div>
+            <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+              <p className="text-xs text-gray-500">Proxima ejecucion</p>
+              <p className="mt-1 text-sm font-semibold text-gray-900">
+                {dashboardStats?.proxima_ejecucion ? formatDateTime(dashboardStats.proxima_ejecucion) : 'Pendiente de programacion'}
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Formulario */}

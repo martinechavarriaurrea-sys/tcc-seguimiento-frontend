@@ -76,6 +76,9 @@ export interface SystemHealth {
   uptime_seconds: number;
   ultima_consulta_tcc: string | null;
   scheduler_activo: boolean;
+  scheduler_mode?: 'embedded' | 'external' | 'disabled';
+  email_configured?: boolean;
+  cron_protected?: boolean;
   total_guias_bd: number;
   bd_conectada: boolean;
   mensaje?: string;
