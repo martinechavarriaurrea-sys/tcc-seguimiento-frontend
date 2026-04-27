@@ -27,7 +27,7 @@ const ESTADO_LABEL: Record<string, string> = {
   devuelto: 'En Proceso De Devolución',
   fallido: 'No Entregada',
   cerrado: 'Cerrada',
-  desconocido: 'Pendiente',
+  desconocido: 'Sin dato TCC',
 };
 
 const ESTADO_COLOR: Record<string, string> = {
@@ -67,14 +67,19 @@ export default function DashboardPage() {
   const entregadas = guias.filter((g) => g.estado_actual === 'entregado').length;
   const enRuta = guias.filter((g) => EN_RUTA.has(g.estado_actual)).length;
   const canceladas = guias.filter((g) => CANCELADAS.has(g.estado_actual)).length;
+  const nextReport = dashboardStats?.proxima_reporte ?? dashboardStats?.proxima_ejecucion;
+  const automationState =
+    dashboardStats?.estado_automatizacion === 'ejecutado'
+      ? 'Activo'
+      : 'Programado';
 
   async function onSubmit(values: FormValues) {
     setApiError(null);
     try {
       await mutateAsync({ numero_guia: values.numero_guia, asesor: values.asesor, cliente: values.cliente, fecha_despacho: values.fecha_despacho || undefined });
       reset();
-      // Refrescar después de 6s para mostrar estado TCC actualizado
-      setTimeout(() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.guias }), 6000);
+      // TCC response time is 2-8s; 10s gives enough margin for first result
+      setTimeout(() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.guias }), 10000);
     } catch (err) {
       setApiError(extractApiErrorMessage(err));
     }
@@ -112,20 +117,29 @@ export default function DashboardPage() {
               <p className="text-xs text-gray-500">Seguimiento programado 07:00, 12:00 y 16:00</p>
             </div>
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-3">
             <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
-              <p className="text-xs text-gray-500">Ultima ejecucion</p>
+              <p className="text-xs text-gray-500">Estado</p>
+              <p className="mt-1 text-sm font-semibold text-green-700">{automationState}</p>
+            </div>
+            <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+              <p className="text-xs text-gray-500">Ultimo reporte</p>
               <p className="mt-1 text-sm font-semibold text-gray-900">
                 {dashboardStats?.ultima_ejecucion ? formatDateTime(dashboardStats.ultima_ejecucion) : 'Sin registros recientes'}
               </p>
             </div>
             <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
-              <p className="text-xs text-gray-500">Proxima ejecucion</p>
+              <p className="text-xs text-gray-500">Proximo reporte</p>
               <p className="mt-1 text-sm font-semibold text-gray-900">
-                {dashboardStats?.proxima_ejecucion ? formatDateTime(dashboardStats.proxima_ejecucion) : 'Pendiente de programacion'}
+                {nextReport ? formatDateTime(nextReport) : 'Programado por GitHub Actions'}
               </p>
             </div>
           </div>
+          {dashboardStats?.proxima_alerta && (
+            <p className="mt-3 text-xs text-gray-500">
+              Alertas de 72h: proxima revision {formatDateTime(dashboardStats.proxima_alerta)}.
+            </p>
+          )}
         </div>
 
         {/* Formulario */}

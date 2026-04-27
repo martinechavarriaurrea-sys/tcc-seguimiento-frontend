@@ -70,6 +70,10 @@ export interface DashboardStats {
   monitoreadas_hoy: number;
   ultima_ejecucion: string | null;
   proxima_ejecucion: string | null;
+  proxima_reporte?: string | null;
+  proxima_alerta?: string | null;
+  proxima_limpieza?: string | null;
+  estado_automatizacion?: 'programado' | 'ejecutado';
 }
 
 export interface SystemHealth {
@@ -80,6 +84,7 @@ export interface SystemHealth {
   scheduler_activo: boolean;
   scheduler_mode?: 'embedded' | 'external' | 'disabled';
   email_configured?: boolean;
+  email_mode?: 'smtp' | 'github_actions' | 'not_configured';
   cron_protected?: boolean;
   total_guias_bd: number;
   bd_conectada: boolean;

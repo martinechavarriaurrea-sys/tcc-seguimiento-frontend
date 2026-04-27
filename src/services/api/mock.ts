@@ -135,6 +135,10 @@ export const mockDashboard = {
       monitoreadas_hoy: mockGuias.length,
       ultima_ejecucion: '2026-04-22T12:00:00',
       proxima_ejecucion: '2026-04-22T16:00:00',
+      proxima_reporte: '2026-04-22T16:00:00',
+      proxima_alerta: '2026-04-22T12:30:00',
+      proxima_limpieza: '2026-04-27T06:00:00',
+      estado_automatizacion: 'ejecutado',
     };
   },
 };
@@ -221,6 +225,7 @@ export const mockSystem = {
       scheduler_activo: true,
       scheduler_mode: 'embedded',
       email_configured: true,
+      email_mode: 'smtp',
       cron_protected: true,
       total_guias_bd: mockGuias.length,
       bd_conectada: true,

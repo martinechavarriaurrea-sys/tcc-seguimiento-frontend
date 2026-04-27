@@ -37,6 +37,11 @@ export default function SistemaPage() {
       : data?.scheduler_mode === 'embedded'
         ? 'Scheduler interno del backend'
         : 'Sin scheduler residente en este deployment';
+  const emailOk = Boolean(data?.email_configured) || data?.email_mode === 'github_actions';
+  const emailDescription =
+    data?.email_mode === 'github_actions'
+      ? 'Reportes y alertas enviados por GitHub Actions'
+      : 'Configuracion para enviar reportes y alertas';
 
   const statusBadge = data
     ? {
@@ -76,7 +81,7 @@ export default function SistemaPage() {
               <div>
                 <StatusRow ok={data.bd_conectada} label="Base de datos" description="Conexion a PostgreSQL/SQLite" />
                 <StatusRow ok={automationOk} label="Automatizacion" description={schedulerDescription} />
-                <StatusRow ok={Boolean(data.email_configured)} label="Correo saliente" description="Configuracion para enviar reportes y alertas" />
+                <StatusRow ok={emailOk} label="Correo saliente" description={emailDescription} />
                 <StatusRow ok={Boolean(data.cron_protected)} label="Proteccion de cron" description="Validacion del disparo automatico" />
                 <StatusRow ok={data.status === 'ok'} label="API FastAPI" description="Endpoints disponibles" />
                 {data.mensaje && <p className="mt-3 text-xs text-gray-500">{data.mensaje}</p>}
