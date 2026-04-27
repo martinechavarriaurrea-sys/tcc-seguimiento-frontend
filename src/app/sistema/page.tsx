@@ -27,6 +27,10 @@ function StatusRow({ ok, label, description }: { ok: boolean; label: string; des
 
 export default function SistemaPage() {
   const { data, isLoading, isError } = useSystem();
+  const automationOk =
+    data?.scheduler_mode === 'external'
+      ? Boolean(data.cron_protected)
+      : Boolean(data?.scheduler_activo);
   const schedulerDescription =
     data?.scheduler_mode === 'external'
       ? 'Automatizacion externa sobre el backend desplegado'
@@ -71,7 +75,7 @@ export default function SistemaPage() {
             ) : data ? (
               <div>
                 <StatusRow ok={data.bd_conectada} label="Base de datos" description="Conexion a PostgreSQL/SQLite" />
-                <StatusRow ok={data.scheduler_activo} label="Automatizacion" description={schedulerDescription} />
+                <StatusRow ok={automationOk} label="Automatizacion" description={schedulerDescription} />
                 <StatusRow ok={Boolean(data.email_configured)} label="Correo saliente" description="Configuracion para enviar reportes y alertas" />
                 <StatusRow ok={Boolean(data.cron_protected)} label="Proteccion de cron" description="Validacion del disparo automatico" />
                 <StatusRow ok={data.status === 'ok'} label="API FastAPI" description="Endpoints disponibles" />
