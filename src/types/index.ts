@@ -49,7 +49,8 @@ export interface GuiaResumen {
   cliente?: string;
   estado_actual: EstadoGuia;
   fecha_ultima_actualizacion: string;
-  dias_en_transito: number;
+  fecha_despacho?: string | null;
+  dias_en_transito: number | null;
   activa: boolean;
   tiene_alerta: boolean;
 }
@@ -58,6 +59,7 @@ export interface RegistrarGuiaPayload {
   numero_guia: string;
   asesor: string;
   cliente?: string;
+  fecha_despacho?: string;
 }
 
 export interface DashboardStats {
