@@ -5,15 +5,23 @@ import { useQueryClient } from '@tanstack/react-query';
 import { dispatchService, type CycleLabel, type RunInfo } from '@/services/api/dispatch.service';
 import { QUERY_KEYS } from '@/lib/constants';
 
-export type DispatchState = 'idle' | 'triggering' | 'queued' | 'in_progress' | 'completed' | 'failed';
+export type DispatchState =
+  | 'idle'         // listo para usar
+  | 'checking'     // verificando que el sistema esté listo
+  | 'ready'        // verificado, esperando clic
+  | 'triggering'   // enviando orden a GitHub
+  | 'queued'       // GitHub recibió, esperando runner
+  | 'in_progress'  // runner activo, consultando TCC
+  | 'completed'    // éxito, dashboard actualizado
+  | 'failed';      // error con detalle visible
 
-const POLL_INTERVAL_MS = 5_000;
+const POLL_MS = 5_000;
+const RUN_APPEAR_TIMEOUT_MS = 90_000; // si en 90s no aparece el run, advertir
 
-// Calcula el ciclo actual según hora de Bogotá (UTC-5)
-function currentCycleBogota(): CycleLabel {
-  const bogotaHour = (new Date().getUTCHours() - 5 + 24) % 24;
-  if (bogotaHour < 9) return '0700';
-  if (bogotaHour < 14) return '1200';
+function bogotaCycle(): CycleLabel {
+  const h = (new Date().getUTCHours() - 5 + 24) % 24;
+  if (h < 9) return '0700';
+  if (h < 14) return '1200';
   return '1600';
 }
 
@@ -23,56 +31,94 @@ export function useDispatch() {
   const [run, setRun] = useState<RunInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [triggeredAt, setTriggeredAt] = useState<string | null>(null);
+  const [runAppearedAt, setRunAppearedAt] = useState<number | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const stopPolling = useCallback(() => {
-    if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
+  const stopAll = useCallback(() => {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+    if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
   }, []);
 
-  // Poll GitHub status every 5s while active
+  useEffect(() => () => stopAll(), [stopAll]);
+
   const startPolling = useCallback((startedAfter: string) => {
-    stopPolling();
+    stopAll();
+
+    // Timeout: si en 90s no aparece el run, avisar al usuario
+    timeoutRef.current = setTimeout(() => {
+      if (pollRef.current) {
+        setState('failed');
+        setError('GitHub Actions tardó más de 90 segundos en iniciar el run. Verifica en github.com/actions si fue recibido.');
+        stopAll();
+      }
+    }, RUN_APPEAR_TIMEOUT_MS);
+
+    const triggerMs = new Date(startedAfter).getTime() - 5_000; // 5s margen
+
     pollRef.current = setInterval(async () => {
       try {
-        const info = await dispatchService.getStatus();
-        if (!info) return;
+        const resp = await dispatchService.getStatus();
+        if (!resp) return;
 
-        // Ignore runs that started before our trigger
-        const runStart = info.started_at ? new Date(info.started_at).getTime() : 0;
-        const triggerTime = new Date(startedAfter).getTime() - 3000; // 3s margin
-        if (runStart < triggerTime) return;
+        const { latest, recent } = resp;
 
-        setRun(info);
+        // Buscar en los 5 runs recientes el que corresponde a este trigger
+        const match = recent.find((r) => {
+          const runMs = r.started_at ? new Date(r.started_at).getTime() : 0;
+          return runMs >= triggerMs;
+        }) ?? (latest.started_at && new Date(latest.started_at).getTime() >= triggerMs ? latest : null);
 
-        if (info.status === 'completed') {
-          stopPolling();
-          if (info.conclusion === 'success') {
+        if (!match) return; // aún no aparece en GitHub API, seguir esperando
+
+        // Primera vez que aparece: cancelar el timeout de "no aparece"
+        if (!runAppearedAt) {
+          setRunAppearedAt(Date.now());
+          if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
+        }
+
+        setRun(match);
+
+        if (match.status === 'completed') {
+          stopAll();
+          if (match.conclusion === 'success') {
             setState('completed');
-            // Refresh dashboard data now that TCC was queried
             queryClient.invalidateQueries({ queryKey: QUERY_KEYS.dashboard });
             queryClient.invalidateQueries({ queryKey: QUERY_KEYS.guias });
           } else {
             setState('failed');
-            setError(`El workflow terminó con conclusión: ${info.conclusion ?? 'desconocida'}`);
+            setError(`El workflow terminó con error: ${match.conclusion ?? 'desconocido'}. Revisa los logs de GitHub Actions.`);
           }
         } else {
-          setState(info.status === 'in_progress' ? 'in_progress' : 'queued');
+          setState(match.status === 'in_progress' ? 'in_progress' : 'queued');
         }
       } catch {
-        // Network error during poll — keep polling silently
+        // Error de red durante el polling — no interrumpir, solo esperar el siguiente intento
       }
-    }, POLL_INTERVAL_MS);
-  }, [stopPolling, queryClient]);
+    }, POLL_MS);
+  }, [stopAll, queryClient, runAppearedAt]);
 
-  useEffect(() => () => stopPolling(), [stopPolling]);
+  // Verificar estado del sistema al montar
+  const checkHealth = useCallback(async () => {
+    setState('checking');
+    setError(null);
+    try {
+      await dispatchService.health();
+      setState('ready');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Sistema no disponible.';
+      setState('failed');
+      setError(msg);
+    }
+  }, []);
+
+  useEffect(() => { checkHealth(); }, [checkHealth]);
 
   const trigger = useCallback(async (cycle?: CycleLabel) => {
-    const resolvedCycle = cycle ?? currentCycleBogota();
+    const resolvedCycle = cycle ?? bogotaCycle();
     setError(null);
     setRun(null);
+    setRunAppearedAt(null);
     setState('triggering');
 
     try {
@@ -81,29 +127,26 @@ export function useDispatch() {
       setState('queued');
       startPolling(result.triggered_at);
     } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
-        'No se pudo iniciar el ciclo. Verifica que GITHUB_TOKEN esté configurado en Vercel.';
+      const msg = err instanceof Error ? err.message : 'No se pudo iniciar el ciclo.';
       setError(msg);
       setState('failed');
     }
   }, [startPolling]);
 
+  const retry = useCallback(() => {
+    stopAll();
+    checkHealth();
+  }, [stopAll, checkHealth]);
+
   const reset = useCallback(() => {
-    stopPolling();
-    setState('idle');
+    stopAll();
+    setState('checking');
     setRun(null);
     setError(null);
     setTriggeredAt(null);
-  }, [stopPolling]);
+    setRunAppearedAt(null);
+    checkHealth();
+  }, [stopAll, checkHealth]);
 
-  return {
-    state,
-    run,
-    error,
-    triggeredAt,
-    trigger,
-    reset,
-    currentCycle: currentCycleBogota(),
-  };
+  return { state, run, error, triggeredAt, trigger, reset, retry, currentCycle: bogotaCycle() };
 }
