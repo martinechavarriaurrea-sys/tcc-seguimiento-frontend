@@ -6,17 +6,15 @@ import { dispatchService, type CycleLabel, type RunInfo } from '@/services/api/d
 import { QUERY_KEYS } from '@/lib/constants';
 
 export type DispatchState =
-  | 'idle'         // listo para usar
-  | 'checking'     // verificando que el sistema esté listo
-  | 'ready'        // verificado, esperando clic
-  | 'triggering'   // enviando orden a GitHub
-  | 'queued'       // GitHub recibió, esperando runner
-  | 'in_progress'  // runner activo, consultando TCC
-  | 'completed'    // éxito, dashboard actualizado
-  | 'failed';      // error con detalle visible
+  | 'idle'
+  | 'triggering'
+  | 'queued'
+  | 'in_progress'
+  | 'completed'
+  | 'failed';
 
 const POLL_MS = 5_000;
-const RUN_APPEAR_TIMEOUT_MS = 90_000; // si en 90s no aparece el run, advertir
+const TIMEOUT_MS = 120_000;
 
 function bogotaCycle(): CycleLabel {
   const h = (new Date().getUTCHours() - 5 + 24) % 24;
@@ -30,51 +28,80 @@ export function useDispatch() {
   const [state, setState] = useState<DispatchState>('idle');
   const [run, setRun] = useState<RunInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [triggeredAt, setTriggeredAt] = useState<string | null>(null);
-  const [runAppearedAt, setRunAppearedAt] = useState<number | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Refs — evitan stale closures sin causar re-renders
+  const pollRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const triggerMs = useRef<number>(0);
+  const runFound  = useRef<boolean>(false);
 
   const stopAll = useCallback(() => {
-    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-    if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
+    if (pollRef.current)  { clearInterval(pollRef.current);  pollRef.current  = null; }
+    if (timerRef.current) { clearTimeout(timerRef.current);  timerRef.current = null; }
   }, []);
 
+  // Limpieza al desmontar
   useEffect(() => () => stopAll(), [stopAll]);
 
-  const startPolling = useCallback((startedAfter: string) => {
+  const trigger = useCallback(async (cycle?: CycleLabel) => {
     stopAll();
+    const c = cycle ?? bogotaCycle();
 
-    // Timeout: si en 90s no aparece el run, avisar al usuario
-    timeoutRef.current = setTimeout(() => {
-      if (pollRef.current) {
-        setState('failed');
-        setError('GitHub Actions tardó más de 90 segundos en iniciar el run. Verifica en github.com/actions si fue recibido.');
-        stopAll();
-      }
-    }, RUN_APPEAR_TIMEOUT_MS);
+    setError(null);
+    setRun(null);
+    runFound.current  = false;
+    triggerMs.current = 0;
+    setState('triggering');
 
-    const triggerMs = new Date(startedAfter).getTime() - 5_000; // 5s margen
+    // 1. Verificar que el sistema esté listo ANTES de mostrar spinner largo
+    try {
+      await dispatchService.health();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Sistema no disponible. Intenta en unos segundos.');
+      setState('failed');
+      return;
+    }
 
+    // 2. Disparar workflow en GitHub (3 reintentos internos en el backend)
+    let triggeredAt: string;
+    try {
+      const result = await dispatchService.trigger(c);
+      triggeredAt = result.triggered_at;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo iniciar el ciclo en GitHub Actions.');
+      setState('failed');
+      return;
+    }
+
+    // Tiempo mínimo del run: 10 segundos antes del trigger para tolerar desfase de reloj
+    triggerMs.current = new Date(triggeredAt).getTime() - 10_000;
+    setState('queued');
+
+    // 3. Timeout: si en 2 minutos no aparece el run, avisar
+    timerRef.current = setTimeout(() => {
+      stopAll();
+      setState('failed');
+      setError('GitHub Actions no respondió en 2 minutos. Verifica en github.com si el run fue creado.');
+    }, TIMEOUT_MS);
+
+    // 4. Polling cada 5s — usa refs, sin dependencias de estado
     pollRef.current = setInterval(async () => {
       try {
         const resp = await dispatchService.getStatus();
         if (!resp) return;
 
-        const { latest, recent } = resp;
-
         // Buscar en los 5 runs recientes el que corresponde a este trigger
-        const match = recent.find((r) => {
-          const runMs = r.started_at ? new Date(r.started_at).getTime() : 0;
-          return runMs >= triggerMs;
-        }) ?? (latest.started_at && new Date(latest.started_at).getTime() >= triggerMs ? latest : null);
+        const match = resp.recent.find(r => {
+          const ms = r.started_at ? new Date(r.started_at).getTime() : 0;
+          return ms >= triggerMs.current;
+        }) ?? null;
 
-        if (!match) return; // aún no aparece en GitHub API, seguir esperando
+        if (!match) return; // Aún no aparece, seguir esperando
 
         // Primera vez que aparece: cancelar el timeout de "no aparece"
-        if (!runAppearedAt) {
-          setRunAppearedAt(Date.now());
-          if (timeoutRef.current) { clearTimeout(timeoutRef.current); timeoutRef.current = null; }
+        if (!runFound.current) {
+          runFound.current = true;
+          if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
         }
 
         setRun(match);
@@ -87,66 +114,25 @@ export function useDispatch() {
             queryClient.invalidateQueries({ queryKey: QUERY_KEYS.guias });
           } else {
             setState('failed');
-            setError(`El workflow terminó con error: ${match.conclusion ?? 'desconocido'}. Revisa los logs de GitHub Actions.`);
+            setError(`El workflow terminó con error: "${match.conclusion}". Revisa los logs de GitHub Actions.`);
           }
         } else {
           setState(match.status === 'in_progress' ? 'in_progress' : 'queued');
         }
       } catch {
-        // Error de red durante el polling — no interrumpir, solo esperar el siguiente intento
+        // Error de red durante el poll — ignorar y reintentar en el próximo ciclo
       }
     }, POLL_MS);
-  }, [stopAll, queryClient, runAppearedAt]);
-
-  // Verificar estado del sistema al montar
-  const checkHealth = useCallback(async () => {
-    setState('checking');
-    setError(null);
-    try {
-      await dispatchService.health();
-      setState('ready');
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Sistema no disponible.';
-      setState('failed');
-      setError(msg);
-    }
-  }, []);
-
-  useEffect(() => { checkHealth(); }, [checkHealth]);
-
-  const trigger = useCallback(async (cycle?: CycleLabel) => {
-    const resolvedCycle = cycle ?? bogotaCycle();
-    setError(null);
-    setRun(null);
-    setRunAppearedAt(null);
-    setState('triggering');
-
-    try {
-      const result = await dispatchService.trigger(resolvedCycle);
-      setTriggeredAt(result.triggered_at);
-      setState('queued');
-      startPolling(result.triggered_at);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'No se pudo iniciar el ciclo.';
-      setError(msg);
-      setState('failed');
-    }
-  }, [startPolling]);
-
-  const retry = useCallback(() => {
-    stopAll();
-    checkHealth();
-  }, [stopAll, checkHealth]);
+  }, [stopAll, queryClient]);
 
   const reset = useCallback(() => {
     stopAll();
-    setState('checking');
+    setState('idle');
     setRun(null);
     setError(null);
-    setTriggeredAt(null);
-    setRunAppearedAt(null);
-    checkHealth();
-  }, [stopAll, checkHealth]);
+    runFound.current  = false;
+    triggerMs.current = 0;
+  }, [stopAll]);
 
-  return { state, run, error, triggeredAt, trigger, reset, retry, currentCycle: bogotaCycle() };
+  return { state, run, error, trigger, reset, currentCycle: bogotaCycle() };
 }
