@@ -81,10 +81,15 @@ function extractDetail(err: unknown): string {
 }
 
 export const dispatchService = {
+  // health y status son públicos — no requieren token
   async health(): Promise<HealthResult> {
     if (IS_MOCK) return mockDispatch.health();
-    const { data } = await apiClient.get<HealthResult>('/dispatch/health');
-    return data;
+    try {
+      const { data } = await apiClient.get<HealthResult>('/dispatch/health');
+      return data;
+    } catch (err) {
+      throw new Error(extractDetail(err));
+    }
   },
 
   async trigger(cycle: CycleLabel): Promise<TriggerResult> {
@@ -105,7 +110,8 @@ export const dispatchService = {
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number } })?.response?.status;
       if (status === 404) return null;
-      throw new Error(extractDetail(err));
+      // Errores de red durante polling: no propagar, retornar null
+      return null;
     }
   },
 };

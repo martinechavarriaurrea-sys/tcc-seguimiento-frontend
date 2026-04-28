@@ -21,7 +21,10 @@ function createApiClient(): AxiosInstance {
   client.interceptors.response.use(
     (response) => response,
     (error: AxiosError) => {
-      if (error.response?.status === 401 && typeof window !== 'undefined') {
+      // No redirigir a login para endpoints de dispatch — manejan su propio error
+      const url = error.config?.url ?? '';
+      const isDispatch = url.includes('/dispatch/');
+      if (error.response?.status === 401 && !isDispatch && typeof window !== 'undefined') {
         localStorage.removeItem(TOKEN_KEY);
         document.cookie = 'tcc_auth=; path=/; max-age=0';
         window.location.href = '/login?session=expired';
