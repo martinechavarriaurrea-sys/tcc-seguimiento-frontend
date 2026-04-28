@@ -114,7 +114,7 @@ export default function DashboardPage() {
             </div>
             <div>
               <h2 className="text-sm font-semibold text-gray-900">Ejecucion automatica</h2>
-              <p className="text-xs text-gray-500">Seguimiento programado 07:00, 12:00 y 16:00</p>
+              <p className="text-xs text-gray-500">Consulta 07:00, 12:00, 16:00; email Outlook 07:03, 12:03, 16:03</p>
             </div>
           </div>
           <div className="grid gap-4 md:grid-cols-3">
@@ -140,6 +140,9 @@ export default function DashboardPage() {
               Alertas de 72h: proxima revision {formatDateTime(dashboardStats.proxima_alerta)}.
             </p>
           )}
+          <p className="mt-2 text-xs text-gray-500">
+            Respaldo de envio: 07:20, 12:20 y 16:20. Si el reporte ya fue enviado, no se duplica.
+          </p>
         </div>
 
         {/* Formulario */}

@@ -10,6 +10,12 @@ import { useSystem } from '@/hooks/useSystem';
 import { formatDateTime, formatRelative, formatUptime } from '@/utils/format';
 import { cn } from '@/utils/cn';
 
+const AUTOMATION_SCHEDULE = [
+  { label: 'Corte 07:00', query: 'Consulta TCC 07:00', email: 'Email Outlook 07:03', backup: 'Respaldo 07:20' },
+  { label: 'Corte 12:00', query: 'Consulta TCC 12:00', email: 'Email Outlook 12:03', backup: 'Respaldo 12:20' },
+  { label: 'Corte 16:00', query: 'Consulta TCC 16:00', email: 'Email Outlook 16:03', backup: 'Respaldo 16:20' },
+];
+
 function StatusRow({ ok, label, description }: { ok: boolean; label: string; description?: string }) {
   return (
     <div className="flex items-start justify-between gap-4 border-b border-gray-100 py-3 last:border-0">
@@ -152,12 +158,14 @@ export default function SistemaPage() {
               <CardTitle>Horarios de ejecucion automatica</CardTitle>
             </CardHeader>
             <div className="grid gap-4 sm:grid-cols-3">
-              {['07:00 AM', '12:00 PM', '04:00 PM'].map((hora) => (
-                <div key={hora} className="flex items-center gap-3 rounded-lg border border-gray-100 bg-gray-50 p-4">
+              {AUTOMATION_SCHEDULE.map((item) => (
+                <div key={item.label} className="flex items-start gap-3 rounded-lg border border-gray-100 bg-gray-50 p-4">
                   <CalendarClock className="h-5 w-5 text-blue-500" />
                   <div>
-                    <p className="text-sm font-semibold text-gray-900">{hora}</p>
-                    <p className="text-xs text-gray-500">Consulta TCC + reporte + Outlook</p>
+                    <p className="text-sm font-semibold text-gray-900">{item.label}</p>
+                    <p className="text-xs text-gray-500">{item.query}</p>
+                    <p className="text-xs text-gray-500">{item.email}</p>
+                    <p className="text-xs text-gray-400">{item.backup}</p>
                   </div>
                 </div>
               ))}
