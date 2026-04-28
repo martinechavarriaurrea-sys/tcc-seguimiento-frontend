@@ -71,6 +71,11 @@ export interface DashboardStats {
   ultima_ejecucion: string | null;
   proxima_ejecucion: string | null;
   proxima_reporte?: string | null;
+  proximo_email?: string | null;
+  proximo_email_respaldo?: string | null;
+  ultimo_email_enviado?: string | null;
+  ultimo_email_archivo?: string | null;
+  ultimo_email_ciclo?: string | null;
   proxima_alerta?: string | null;
   proxima_limpieza?: string | null;
   estado_automatizacion?: 'programado' | 'ejecutado';

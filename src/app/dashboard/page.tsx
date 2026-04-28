@@ -117,7 +117,7 @@ export default function DashboardPage() {
               <p className="text-xs text-gray-500">Consulta 07:00, 12:00, 16:00; email Outlook 07:03, 12:03, 16:03</p>
             </div>
           </div>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-5">
             <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
               <p className="text-xs text-gray-500">Estado</p>
               <p className="mt-1 text-sm font-semibold text-green-700">{automationState}</p>
@@ -133,6 +133,26 @@ export default function DashboardPage() {
               <p className="mt-1 text-sm font-semibold text-gray-900">
                 {nextReport ? formatDateTime(nextReport) : 'Programado por GitHub Actions'}
               </p>
+            </div>
+            <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+              <p className="text-xs text-gray-500">Ultimo email</p>
+              <p className="mt-1 text-sm font-semibold text-gray-900">
+                {dashboardStats?.ultimo_email_enviado ? formatDateTime(dashboardStats.ultimo_email_enviado) : 'Sin envio registrado'}
+              </p>
+              {dashboardStats?.ultimo_email_ciclo && (
+                <p className="mt-1 text-xs text-gray-400">Ciclo {dashboardStats.ultimo_email_ciclo}</p>
+              )}
+            </div>
+            <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
+              <p className="text-xs text-gray-500">Proximo email</p>
+              <p className="mt-1 text-sm font-semibold text-gray-900">
+                {dashboardStats?.proximo_email ? formatDateTime(dashboardStats.proximo_email) : 'Programado'}
+              </p>
+              {dashboardStats?.proximo_email_respaldo && (
+                <p className="mt-1 text-xs text-gray-400">
+                  Respaldo {formatDateTime(dashboardStats.proximo_email_respaldo)}
+                </p>
+              )}
             </div>
           </div>
           {dashboardStats?.proxima_alerta && (
