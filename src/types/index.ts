@@ -84,7 +84,7 @@ export interface SystemHealth {
   scheduler_activo: boolean;
   scheduler_mode?: 'embedded' | 'external' | 'disabled';
   email_configured?: boolean;
-  email_mode?: 'smtp' | 'github_actions' | 'not_configured';
+  email_mode?: 'smtp' | 'github_actions' | 'external_outlook' | 'not_configured';
   cron_protected?: boolean;
   total_guias_bd: number;
   bd_conectada: boolean;

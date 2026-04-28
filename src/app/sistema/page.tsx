@@ -37,11 +37,16 @@ export default function SistemaPage() {
       : data?.scheduler_mode === 'embedded'
         ? 'Scheduler interno del backend'
         : 'Sin scheduler residente en este deployment';
-  const emailOk = Boolean(data?.email_configured) || data?.email_mode === 'github_actions';
+  const emailOk =
+    Boolean(data?.email_configured) ||
+    data?.email_mode === 'github_actions' ||
+    data?.email_mode === 'external_outlook';
   const emailDescription =
-    data?.email_mode === 'github_actions'
-      ? 'Reportes y alertas enviados por GitHub Actions'
-      : 'Configuracion para enviar reportes y alertas';
+    data?.email_mode === 'external_outlook'
+      ? 'GitHub consulta TCC y Outlook local envia los correos'
+      : data?.email_mode === 'github_actions'
+        ? 'Reportes y alertas enviados por GitHub Actions'
+        : 'Configuracion para enviar reportes y alertas';
 
   const statusBadge = data
     ? {
@@ -152,7 +157,7 @@ export default function SistemaPage() {
                   <CalendarClock className="h-5 w-5 text-blue-500" />
                   <div>
                     <p className="text-sm font-semibold text-gray-900">{hora}</p>
-                    <p className="text-xs text-gray-500">Consulta + reporte + correo</p>
+                    <p className="text-xs text-gray-500">Consulta TCC + reporte + Outlook</p>
                   </div>
                 </div>
               ))}

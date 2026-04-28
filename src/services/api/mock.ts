@@ -225,7 +225,7 @@ export const mockSystem = {
       scheduler_activo: true,
       scheduler_mode: 'embedded',
       email_configured: true,
-      email_mode: 'smtp',
+      email_mode: 'external_outlook',
       cron_protected: true,
       total_guias_bd: mockGuias.length,
       bd_conectada: true,
