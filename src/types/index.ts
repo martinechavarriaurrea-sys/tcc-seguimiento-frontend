@@ -62,22 +62,29 @@ export interface RegistrarGuiaPayload {
   fecha_despacho?: string;
 }
 
+export interface GuiaDashboard {
+  numero_guia: string;
+  estado_actual: string;
+  ultima_actualizacion: string | null;
+}
+
 export interface DashboardStats {
+  // KPIs
   total_activas: number;
+  total_guias_activas: number;
   total_entregadas: number;
+  total_guias_entregadas_hoy: number;
   con_novedad: number;
   sin_movimiento: number;
   monitoreadas_hoy: number;
+  // Timing
   ultima_ejecucion: string | null;
   proxima_ejecucion: string | null;
   proxima_reporte?: string | null;
-  proximo_email?: string | null;
-  proximo_email_respaldo?: string | null;
-  ultimo_email_enviado?: string | null;
-  ultimo_email_archivo?: string | null;
-  ultimo_email_ciclo?: string | null;
-  proxima_alerta?: string | null;
-  proxima_limpieza?: string | null;
+  // Live data
+  guias_activas: GuiaDashboard[];
+  // System health
+  sistema_activo: boolean;
   estado_automatizacion?: 'programado' | 'ejecutado';
 }
 
