@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -53,6 +53,62 @@ const ESTADO_COLOR: Record<string, string> = {
 };
 
 const EN_RUTA = new Set(['registrado', 'recogido', 'en_transito', 'en_ruta_entrega']);
+
+type FilterKey = 'all' | 'en_ruta' | 'novedad' | 'sin_movimiento' | 'entregadas';
+type ChipTone = 'gray' | 'blue' | 'red' | 'amber' | 'green';
+
+const CHIP_ACTIVE: Record<ChipTone, string> = {
+  gray: 'bg-gray-900 text-white border-gray-900',
+  blue: 'bg-blue-600 text-white border-blue-600',
+  red: 'bg-red-600 text-white border-red-600',
+  amber: 'bg-amber-500 text-white border-amber-500',
+  green: 'bg-green-600 text-white border-green-600',
+};
+const CHIP_IDLE: Record<ChipTone, string> = {
+  gray: 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50',
+  blue: 'bg-white text-blue-700 border-blue-200 hover:bg-blue-50',
+  red: 'bg-white text-red-700 border-red-200 hover:bg-red-50',
+  amber: 'bg-white text-amber-700 border-amber-200 hover:bg-amber-50',
+  green: 'bg-white text-green-700 border-green-200 hover:bg-green-50',
+};
+
+const KPI_RING: Record<ChipTone, string> = {
+  gray: 'ring-gray-400',
+  blue: 'ring-blue-400',
+  red: 'ring-red-400',
+  amber: 'ring-amber-400',
+  green: 'ring-green-400',
+};
+
+function ChipFilter({
+  active,
+  onClick,
+  tone = 'gray',
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  tone?: ChipTone;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full border px-3.5 py-1.5 text-xs font-medium transition ${
+        active ? CHIP_ACTIVE[tone] : CHIP_IDLE[tone]
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function kpiBtnCn(active: boolean, tone: ChipTone): string {
+  return `text-left w-full transition rounded-lg ${
+    active ? `ring-2 ${KPI_RING[tone]}` : 'hover:opacity-90'
+  }`;
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -121,7 +177,52 @@ export default function DashboardPage() {
   });
 
   const guias = data?.items ?? [];
-  const enRuta = guias.filter((g) => EN_RUTA.has(g.estado_actual)).length;
+
+  // ── Filtro por chips (cliente) ───────────────────────────────────────────
+  const [filtro, setFiltro] = useState<FilterKey>('all');
+
+  const { guiasFiltradas, conteo } = useMemo(() => {
+    const ahora = Date.now();
+    const hoyStr = new Date().toDateString();
+    const HORAS_SIN_MOV = 48;
+
+    const c: Record<FilterKey, number> = {
+      all: guias.length,
+      en_ruta: 0,
+      novedad: 0,
+      sin_movimiento: 0,
+      entregadas: 0,
+    };
+
+    const esSinMovimiento = (g: GuiaResumen): boolean => {
+      if (!g.activa || !g.fecha_ultima_actualizacion) return false;
+      const horas = (ahora - new Date(g.fecha_ultima_actualizacion).getTime()) / 3600000;
+      return horas > HORAS_SIN_MOV;
+    };
+    const esEntregadaHoy = (g: GuiaResumen): boolean => {
+      if (g.estado_actual !== 'entregado' || !g.fecha_ultima_actualizacion) return false;
+      return new Date(g.fecha_ultima_actualizacion).toDateString() === hoyStr;
+    };
+
+    for (const g of guias) {
+      if (EN_RUTA.has(g.estado_actual)) c.en_ruta++;
+      if (g.estado_actual === 'novedad') c.novedad++;
+      if (esSinMovimiento(g)) c.sin_movimiento++;
+      if (esEntregadaHoy(g)) c.entregadas++;
+    }
+
+    const aplicaFiltro = (g: GuiaResumen): boolean => {
+      switch (filtro) {
+        case 'all': return true;
+        case 'en_ruta': return EN_RUTA.has(g.estado_actual);
+        case 'novedad': return g.estado_actual === 'novedad';
+        case 'sin_movimiento': return esSinMovimiento(g);
+        case 'entregadas': return esEntregadaHoy(g);
+      }
+    };
+
+    return { guiasFiltradas: guias.filter(aplicaFiltro), conteo: c };
+  }, [guias, filtro]);
 
   async function onSubmit(values: FormValues) {
     setApiError(null);
@@ -178,36 +279,60 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* ── KPIs ── */}
+        {/* ── KPIs (clickeables como atajo de filtro) ── */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <KPICard
-            title="Entregadas hoy"
-            value={stats?.total_guias_entregadas_hoy ?? 0}
-            icon={CheckCircle2}
-            iconClassName="bg-green-50 text-green-600"
-            isLoading={isLoading}
-          />
-          <KPICard
-            title="En ruta"
-            value={enRuta}
-            icon={Truck}
-            iconClassName="bg-blue-50 text-blue-600"
-            isLoading={isLoading}
-          />
-          <KPICard
-            title="Con novedad"
-            value={stats?.con_novedad ?? 0}
-            icon={AlertTriangle}
-            iconClassName="bg-red-50 text-red-600"
-            isLoading={isLoading}
-          />
-          <KPICard
-            title="Sin movimiento"
-            value={stats?.sin_movimiento ?? 0}
-            icon={Clock3}
-            iconClassName="bg-amber-50 text-amber-600"
-            isLoading={isLoading}
-          />
+          <button
+            type="button"
+            onClick={() => setFiltro(filtro === 'entregadas' ? 'all' : 'entregadas')}
+            className={kpiBtnCn(filtro === 'entregadas', 'green')}
+          >
+            <KPICard
+              title="Entregadas hoy"
+              value={stats?.total_guias_entregadas_hoy ?? 0}
+              icon={CheckCircle2}
+              iconClassName="bg-green-50 text-green-600"
+              isLoading={isLoading}
+            />
+          </button>
+          <button
+            type="button"
+            onClick={() => setFiltro(filtro === 'en_ruta' ? 'all' : 'en_ruta')}
+            className={kpiBtnCn(filtro === 'en_ruta', 'blue')}
+          >
+            <KPICard
+              title="En ruta"
+              value={conteo.en_ruta}
+              icon={Truck}
+              iconClassName="bg-blue-50 text-blue-600"
+              isLoading={isLoading}
+            />
+          </button>
+          <button
+            type="button"
+            onClick={() => setFiltro(filtro === 'novedad' ? 'all' : 'novedad')}
+            className={kpiBtnCn(filtro === 'novedad', 'red')}
+          >
+            <KPICard
+              title="Con novedad"
+              value={stats?.con_novedad ?? 0}
+              icon={AlertTriangle}
+              iconClassName="bg-red-50 text-red-600"
+              isLoading={isLoading}
+            />
+          </button>
+          <button
+            type="button"
+            onClick={() => setFiltro(filtro === 'sin_movimiento' ? 'all' : 'sin_movimiento')}
+            className={kpiBtnCn(filtro === 'sin_movimiento', 'amber')}
+          >
+            <KPICard
+              title="Sin movimiento"
+              value={stats?.sin_movimiento ?? 0}
+              icon={Clock3}
+              iconClassName="bg-amber-50 text-amber-600"
+              isLoading={isLoading}
+            />
+          </button>
         </div>
 
         {/* ── Estado del ciclo + indicador de polling ── */}
@@ -349,19 +474,43 @@ export default function DashboardPage() {
 
         {/* ── Tabla de guías ── */}
         <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between border-b border-gray-100 px-6 py-3">
+          <div className="flex flex-col gap-3 border-b border-gray-100 px-6 py-3 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-sm font-semibold text-gray-900">Guías registradas</h2>
-            <span className="text-xs text-gray-400">{guias.length} guías</span>
+            <span className="text-xs text-gray-400">
+              {guiasFiltradas.length} {guiasFiltradas.length === 1 ? 'guía' : 'guías'}
+              {filtro !== 'all' && ` de ${guias.length}`}
+            </span>
+          </div>
+
+          {/* Chips de filtro */}
+          <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 bg-gray-50 px-6 py-3">
+            <ChipFilter active={filtro === 'all'} onClick={() => setFiltro('all')}>
+              Todas ({conteo.all})
+            </ChipFilter>
+            <ChipFilter active={filtro === 'en_ruta'} onClick={() => setFiltro('en_ruta')} tone="blue">
+              En ruta ({conteo.en_ruta})
+            </ChipFilter>
+            <ChipFilter active={filtro === 'novedad'} onClick={() => setFiltro('novedad')} tone="red">
+              Con novedad ({conteo.novedad})
+            </ChipFilter>
+            <ChipFilter active={filtro === 'sin_movimiento'} onClick={() => setFiltro('sin_movimiento')} tone="amber">
+              Sin movimiento ({conteo.sin_movimiento})
+            </ChipFilter>
+            <ChipFilter active={filtro === 'entregadas'} onClick={() => setFiltro('entregadas')} tone="green">
+              Entregadas hoy ({conteo.entregadas})
+            </ChipFilter>
           </div>
 
           {isLoading ? (
             <div className="flex items-center justify-center py-12 text-sm text-gray-400">
               Cargando...
             </div>
-          ) : guias.length === 0 ? (
+          ) : guiasFiltradas.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 py-12 text-gray-400">
               <Package className="h-8 w-8 opacity-30" />
-              <p className="text-sm">No hay guías registradas</p>
+              <p className="text-sm">
+                {guias.length === 0 ? 'No hay guías registradas' : 'No hay guías para este filtro'}
+              </p>
             </div>
           ) : (
             <table className="w-full text-sm">
@@ -377,7 +526,7 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {guias.map((g: GuiaResumen) => (
+                {guiasFiltradas.map((g: GuiaResumen) => (
                   <tr key={g.id} className="hover:bg-gray-50">
                     <td className="px-6 py-3 font-mono font-medium text-gray-900">
                       {g.numero_guia}
