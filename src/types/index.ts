@@ -50,6 +50,7 @@ export interface GuiaResumen {
   asesor: string;
   cliente?: string;
   estado_actual: EstadoGuia;
+  estado_raw?: string | null;
   fecha_ultima_actualizacion: string;
   fecha_despacho?: string | null;
   dias_en_transito: number | null;

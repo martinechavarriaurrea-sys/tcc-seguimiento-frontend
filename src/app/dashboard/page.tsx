@@ -609,6 +609,11 @@ export default function DashboardPage() {
                       >
                         {ESTADO_LABEL[g.estado_actual] ?? g.estado_actual}
                       </span>
+                      {g.estado_raw && (
+                        <p className="mt-0.5 truncate max-w-[160px] text-[10px] text-gray-400 italic" title={g.estado_raw}>
+                          {g.estado_raw}
+                        </p>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-400">
                       {formatRelative(g.fecha_ultima_actualizacion)}
