@@ -15,10 +15,10 @@ import {
   Activity,
   MoreVertical,
   XCircle,
-  Trash2,
+  User,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useGuias, useRegistrarGuia, useCerrarGuia, useEliminarGuia } from '@/hooks/useGuias';
+import { useGuias, useRegistrarGuia, useCerrarGuia } from '@/hooks/useGuias';
 import { useDashboard, DASHBOARD_POLL_MS } from '@/hooks/useDashboard';
 import { KPICard } from '@/components/features/dashboard/KPICard';
 import { ManualTrigger } from '@/components/features/dashboard/ManualTrigger';
@@ -178,12 +178,10 @@ export default function DashboardPage() {
 
   const { mutateAsync, isPending } = useRegistrarGuia();
   const { mutateAsync: cerrarGuia, isPending: cerrando } = useCerrarGuia();
-  const { mutateAsync: eliminarGuia, isPending: eliminando } = useEliminarGuia();
   const [apiError, setApiError] = useState<string | null>(null);
 
-  // Menú ••• y modal de confirmación
+  // Menú •••
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<GuiaResumen | null>(null);
   const menuRef = useRef<HTMLTableCellElement>(null);
 
   useEffect(() => {
@@ -201,22 +199,17 @@ export default function DashboardPage() {
     await cerrarGuia(g.id);
   }
 
-  async function handleEliminar() {
-    if (!confirmDelete) return;
-    await eliminarGuia(confirmDelete.id);
-    setConfirmDelete(null);
-  }
-
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
   });
 
   const guias = data?.items ?? [];
 
-  // ── Filtro por chips (cliente) ───────────────────────────────────────────
+  // ── Filtros ───────────────────────────────────────────────────────────────
   const [filtro, setFiltro] = useState<FilterKey>('all');
+  const [filtroAsesor, setFiltroAsesor] = useState<string>('');
 
-  const { guiasFiltradas, conteo } = useMemo(() => {
+  const { guiasFiltradas, conteo, asesoresUnicos } = useMemo(() => {
     const ahora = Date.now();
     const hoyStr = new Date().toDateString();
     const HORAS_SIN_MOV = 48;
@@ -249,19 +242,30 @@ export default function DashboardPage() {
       if (esEntregadaHoy(g)) c.entregadas_hoy++;
     }
 
+    // Lista de asesores únicos, ordenada A-Z
+    const asesoresUnicos = Array.from(new Set(guias.map((g) => g.asesor))).sort((a, b) =>
+      a.localeCompare(b, 'es')
+    );
+
     const aplicaFiltro = (g: GuiaResumen): boolean => {
-      switch (filtro) {
-        case 'all': return true;
-        case 'en_ruta': return EN_RUTA.has(g.estado_actual);
-        case 'novedad': return g.estado_actual === 'novedad';
-        case 'sin_movimiento': return esSinMovimiento(g);
-        case 'entregadas': return esEntregada(g);
-        case 'entregadas_hoy': return esEntregadaHoy(g);
-      }
+      // Filtro por chip
+      const pasaChip = (() => {
+        switch (filtro) {
+          case 'all': return true;
+          case 'en_ruta': return EN_RUTA.has(g.estado_actual);
+          case 'novedad': return g.estado_actual === 'novedad';
+          case 'sin_movimiento': return esSinMovimiento(g);
+          case 'entregadas': return esEntregada(g);
+          case 'entregadas_hoy': return esEntregadaHoy(g);
+        }
+      })();
+      // Filtro por asesor (AND con chip)
+      const pasaAsesor = filtroAsesor === '' || g.asesor === filtroAsesor;
+      return pasaChip && pasaAsesor;
     };
 
-    return { guiasFiltradas: guias.filter(aplicaFiltro), conteo: c };
-  }, [guias, filtro]);
+    return { guiasFiltradas: guias.filter(aplicaFiltro), conteo: c, asesoresUnicos };
+  }, [guias, filtro, filtroAsesor]);
 
   async function onSubmit(values: FormValues) {
     setApiError(null);
@@ -521,7 +525,7 @@ export default function DashboardPage() {
             </span>
           </div>
 
-          {/* Chips de filtro */}
+          {/* Chips de filtro + selector de asesor */}
           <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 bg-gray-50 px-6 py-3">
             <ChipFilter active={filtro === 'all'} onClick={() => setFiltro('all')}>
               Todas ({conteo.all})
@@ -541,6 +545,25 @@ export default function DashboardPage() {
             <ChipFilter active={filtro === 'entregadas_hoy'} onClick={() => setFiltro('entregadas_hoy')} tone="green">
               Entregadas hoy ({conteo.entregadas_hoy})
             </ChipFilter>
+
+            {/* Selector de asesor */}
+            <div className="ml-auto flex items-center gap-1.5">
+              <User className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+              <select
+                value={filtroAsesor}
+                onChange={(e) => setFiltroAsesor(e.target.value)}
+                className={`rounded-full border py-1.5 pl-2.5 pr-7 text-xs font-medium transition appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-300 ${
+                  filtroAsesor
+                    ? 'border-blue-400 bg-blue-600 text-white'
+                    : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <option value="">Todos los asesores</option>
+                {asesoresUnicos.map((a) => (
+                  <option key={a} value={a}>{a}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {isLoading ? (
@@ -616,23 +639,20 @@ export default function DashboardPage() {
 
                       {menuOpenId === g.id && (
                         <div className="absolute right-2 top-10 z-20 w-44 rounded-lg border border-gray-200 bg-white shadow-lg">
-                          {g.activa && (
+                          {g.activa ? (
                             <button
                               onClick={() => handleCerrar(g)}
                               disabled={cerrando}
-                              className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 rounded-t-lg"
+                              className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 rounded-lg"
                             >
                               <XCircle className="h-4 w-4 text-gray-400" />
                               Cerrar guía
                             </button>
+                          ) : (
+                            <p className="px-4 py-2.5 text-xs text-gray-400 rounded-lg">
+                              Guía cerrada
+                            </p>
                           )}
-                          <button
-                            onClick={() => { setMenuOpenId(null); setConfirmDelete(g); }}
-                            className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 rounded-b-lg"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            Eliminar
-                          </button>
                         </div>
                       )}
                     </td>
@@ -645,37 +665,6 @@ export default function DashboardPage() {
 
       </div>
 
-      {/* Modal de confirmación de eliminación */}
-      {confirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
-            <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-red-100">
-              <Trash2 className="h-5 w-5 text-red-600" />
-            </div>
-            <h3 className="text-base font-semibold text-gray-900">Eliminar guía</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              ¿Seguro que quieres eliminar la guía{' '}
-              <span className="font-mono font-semibold text-gray-800">{confirmDelete.numero_guia}</span>
-              {confirmDelete.cliente ? ` (${confirmDelete.cliente})` : ''}? Esta acción no se puede deshacer.
-            </p>
-            <div className="mt-5 flex gap-3">
-              <button
-                onClick={() => setConfirmDelete(null)}
-                className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleEliminar}
-                disabled={eliminando}
-                className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
-              >
-                {eliminando ? 'Eliminando...' : 'Sí, eliminar'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
