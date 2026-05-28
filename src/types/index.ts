@@ -2,10 +2,12 @@ export type EstadoGuia =
   | 'registrado'
   | 'recogido'
   | 'en_transito'
+  | 'en_tcc'
   | 'en_ruta_entrega'
   | 'entregado'
   | 'novedad'
   | 'devuelto'
+  | 'reemplazado'
   | 'cerrado';
 
 export type TipoAlerta = 'sin_movimiento' | 'novedad' | 'retraso';

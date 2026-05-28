@@ -5,11 +5,15 @@ import { QUERY_KEYS, STALE_TIMES } from '@/lib/constants';
 import { extractApiErrorMessage } from '@/utils/format';
 import type { GuiasFilters, RegistrarGuiaPayload } from '@/types';
 
+export const GUIAS_POLL_MS = 60_000;
+
 export function useGuias(filters?: GuiasFilters) {
   return useQuery({
     queryKey: [...QUERY_KEYS.guias, filters],
     queryFn: () => guiasService.list(filters),
     staleTime: STALE_TIMES.guias,
+    refetchInterval: GUIAS_POLL_MS,
+    placeholderData: (prev) => prev,
   });
 }
 
@@ -61,6 +65,21 @@ export function useRefreshGuia() {
       queryClient.setQueryData(QUERY_KEYS.guia(data.id), data);
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.guias });
       toast.success('Estado actualizado desde TCC.');
+    },
+    onError: (error) => {
+      toast.error(extractApiErrorMessage(error));
+    },
+  });
+}
+
+export function useEliminarGuia() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => guiasService.eliminar(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.guias });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.dashboard });
+      toast.success('Guía eliminada del sistema.');
     },
     onError: (error) => {
       toast.error(extractApiErrorMessage(error));
