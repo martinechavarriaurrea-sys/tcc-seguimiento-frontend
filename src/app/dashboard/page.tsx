@@ -265,7 +265,19 @@ export default function DashboardPage() {
       return pasaChip && pasaAsesor;
     };
 
-    return { guiasFiltradas: guias.filter(aplicaFiltro), conteo: c, asesoresUnicos };
+    const esAlerta = (g: GuiaResumen) =>
+      g.activa && g.dias_en_transito != null && g.dias_en_transito > 5;
+
+    const filtradas = guias.filter(aplicaFiltro).sort((a, b) => {
+      // Guías con alerta (+5 días) siempre van primero
+      const aAlert = esAlerta(a) ? 0 : 1;
+      const bAlert = esAlerta(b) ? 0 : 1;
+      if (aAlert !== bAlert) return aAlert - bAlert;
+      // Dentro de cada grupo: más días primero
+      return (b.dias_en_transito ?? 0) - (a.dias_en_transito ?? 0);
+    });
+
+    return { guiasFiltradas: filtradas, conteo: c, asesoresUnicos };
   }, [guias, filtro, filtroAsesor]);
 
   async function onSubmit(values: FormValues) {
