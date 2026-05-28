@@ -252,7 +252,6 @@ export default function DashboardPage() {
           case 'all': return true;
           case 'en_ruta': return EN_RUTA.has(g.estado_actual);
           case 'novedad': return esDemorada(g);
-          case 'sin_movimiento': return esSinMovimiento(g);
           case 'entregadas': return esEntregada(g);
           case 'entregadas_hoy': return esEntregadaHoy(g);
         }
