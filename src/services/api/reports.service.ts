@@ -1,16 +1,16 @@
 import { isAxiosError } from 'axios';
 import { apiClient } from './client';
 
-export interface PdfDateRange {
+export interface ReportDateRange {
   fechaInicio: string;
   fechaFin: string;
 }
 
-const PDF_MEDIA_TYPE = 'application/pdf';
+/** @deprecated use ReportDateRange */
+export type PdfDateRange = ReportDateRange;
 
-function buildRangePdfFilename({ fechaInicio, fechaFin }: PdfDateRange): string {
-  return `informe_tcc_${fechaInicio}_al_${fechaFin}.pdf`;
-}
+const PDF_MEDIA_TYPE = 'application/pdf';
+const XLSX_MEDIA_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 function triggerBrowserDownload(blob: Blob, filename: string): void {
   const objectUrl = URL.createObjectURL(blob);
@@ -27,9 +27,9 @@ function triggerBrowserDownload(blob: Blob, filename: string): void {
   URL.revokeObjectURL(objectUrl);
 }
 
-async function getErrorMessage(error: unknown): Promise<string> {
+async function getErrorMessage(error: unknown, defaultMsg = 'Error al generar el informe.'): Promise<string> {
   if (!isAxiosError(error)) {
-    return error instanceof Error ? error.message : 'Error al generar el PDF.';
+    return error instanceof Error ? error.message : defaultMsg;
   }
 
   const data = error.response?.data;
@@ -45,27 +45,45 @@ async function getErrorMessage(error: unknown): Promise<string> {
 
   if (typeof data?.detail === 'string') return data.detail;
   if (typeof data?.message === 'string') return data.message;
-  return error.message || 'Error al generar el PDF.';
+  return error.message || defaultMsg;
 }
 
 export const reportsService = {
-  async downloadRangePdf(range: PdfDateRange): Promise<void> {
+  async downloadRangePdf(range: ReportDateRange): Promise<void> {
     try {
       const response = await apiClient.get<Blob>('/reports/range', {
         params: {
           fecha_inicio: range.fechaInicio,
           fecha_fin: range.fechaFin,
+          format: 'pdf',
         },
         responseType: 'blob',
-        headers: {
-          Accept: PDF_MEDIA_TYPE,
-        },
+        headers: { Accept: PDF_MEDIA_TYPE },
       });
 
       const blob = new Blob([response.data], { type: PDF_MEDIA_TYPE });
-      triggerBrowserDownload(blob, buildRangePdfFilename(range));
+      triggerBrowserDownload(blob, `informe_tcc_${range.fechaInicio}_al_${range.fechaFin}.pdf`);
     } catch (error) {
-      throw new Error(await getErrorMessage(error));
+      throw new Error(await getErrorMessage(error, 'Error al generar el PDF.'));
+    }
+  },
+
+  async downloadRangeExcel(range: ReportDateRange): Promise<void> {
+    try {
+      const response = await apiClient.get<Blob>('/reports/range', {
+        params: {
+          fecha_inicio: range.fechaInicio,
+          fecha_fin: range.fechaFin,
+          format: 'xlsx',
+        },
+        responseType: 'blob',
+        headers: { Accept: XLSX_MEDIA_TYPE },
+      });
+
+      const blob = new Blob([response.data], { type: XLSX_MEDIA_TYPE });
+      triggerBrowserDownload(blob, `informe_tcc_${range.fechaInicio}_al_${range.fechaFin}.xlsx`);
+    } catch (error) {
+      throw new Error(await getErrorMessage(error, 'Error al generar el Excel.'));
     }
   },
 };

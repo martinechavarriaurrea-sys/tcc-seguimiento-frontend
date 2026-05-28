@@ -22,6 +22,11 @@ export const ESTADO_CONFIG: Record<EstadoGuia, StatusConfig> = {
     badgeClass: 'bg-blue-100 text-blue-700 ring-blue-200',
     dotClass: 'bg-blue-500',
   },
+  en_tcc: {
+    label: 'TCC',
+    badgeClass: 'bg-cyan-100 text-cyan-700 ring-cyan-200',
+    dotClass: 'bg-cyan-500',
+  },
   en_ruta_entrega: {
     label: 'En ruta de entrega',
     badgeClass: 'bg-indigo-100 text-indigo-700 ring-indigo-200',
@@ -41,6 +46,11 @@ export const ESTADO_CONFIG: Record<EstadoGuia, StatusConfig> = {
     label: 'Devuelto',
     badgeClass: 'bg-orange-100 text-orange-700 ring-orange-200',
     dotClass: 'bg-orange-500',
+  },
+  reemplazado: {
+    label: 'Reemplazada',
+    badgeClass: 'bg-purple-100 text-purple-700 ring-purple-200',
+    dotClass: 'bg-purple-500',
   },
   cerrado: {
     label: 'Cerrado',

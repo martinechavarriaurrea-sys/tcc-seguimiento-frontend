@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { CalendarDays, FileDown } from 'lucide-react';
+import { CalendarDays, FileDown, FileSpreadsheet } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { reportsService } from '@/services/api/reports.service';
@@ -24,26 +24,42 @@ export function PdfDownloadPanel() {
   const today = getToday();
   const [fechaInicio, setFechaInicio] = useState(getDefaultStartDate);
   const [fechaFin, setFechaFin] = useState(today);
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [downloadingExcel, setDownloadingExcel] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const isInvalidRange = fechaInicio > fechaFin;
+  const isDownloading = downloadingPdf || downloadingExcel;
 
-  async function handleDownload() {
+  async function handleDownloadPdf() {
     if (isInvalidRange) {
       setError('La fecha inicio no puede ser posterior a la fecha fin.');
       return;
     }
-
-    setIsDownloading(true);
+    setDownloadingPdf(true);
     setError(null);
-
     try {
       await reportsService.downloadRangePdf({ fechaInicio, fechaFin });
     } catch (downloadError) {
       setError(downloadError instanceof Error ? downloadError.message : 'Error al descargar el PDF.');
     } finally {
-      setIsDownloading(false);
+      setDownloadingPdf(false);
+    }
+  }
+
+  async function handleDownloadExcel() {
+    if (isInvalidRange) {
+      setError('La fecha inicio no puede ser posterior a la fecha fin.');
+      return;
+    }
+    setDownloadingExcel(true);
+    setError(null);
+    try {
+      await reportsService.downloadRangeExcel({ fechaInicio, fechaFin });
+    } catch (downloadError) {
+      setError(downloadError instanceof Error ? downloadError.message : 'Error al descargar el Excel.');
+    } finally {
+      setDownloadingExcel(false);
     }
   }
 
@@ -55,14 +71,17 @@ export function PdfDownloadPanel() {
             <FileDown className="h-4 w-4" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-gray-900">Descargar informe PDF</h2>
-            <p className="text-xs text-gray-500">Rango de fechas</p>
+            <h2 className="text-sm font-semibold text-gray-900">Descargar informe</h2>
+            <p className="text-xs text-gray-500">Rango de fechas — PDF o Excel</p>
           </div>
         </div>
-        <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-500">PDF</span>
+        <div className="flex gap-1.5">
+          <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-600">PDF</span>
+          <span className="rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-600">Excel</span>
+        </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
+      <div className="grid gap-4 md:grid-cols-[1fr_1fr_auto_auto] md:items-end">
         <div className="relative">
           <Input
             label="Fecha inicio"
@@ -90,13 +109,24 @@ export function PdfDownloadPanel() {
 
         <Button
           type="button"
-          onClick={handleDownload}
-          isLoading={isDownloading}
-          disabled={isInvalidRange}
+          onClick={handleDownloadPdf}
+          isLoading={downloadingPdf}
+          disabled={isInvalidRange || isDownloading}
           leftIcon={<FileDown className="h-4 w-4" />}
           className="h-10 w-full md:w-auto"
         >
-          {isDownloading ? 'Generando...' : 'Descargar PDF'}
+          {downloadingPdf ? 'Generando...' : 'PDF'}
+        </Button>
+
+        <Button
+          type="button"
+          onClick={handleDownloadExcel}
+          isLoading={downloadingExcel}
+          disabled={isInvalidRange || isDownloading}
+          leftIcon={<FileSpreadsheet className="h-4 w-4" />}
+          className="h-10 w-full border-green-200 bg-green-50 text-green-700 hover:bg-green-100 md:w-auto"
+        >
+          {downloadingExcel ? 'Generando...' : 'Excel'}
         </Button>
       </div>
 

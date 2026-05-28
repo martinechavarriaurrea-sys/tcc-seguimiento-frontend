@@ -35,6 +35,10 @@ export const guiasService = {
     return data;
   },
 
+  async eliminar(id: string): Promise<void> {
+    await apiClient.delete(`/guias/${id}`);
+  },
+
   async refresh(id: string): Promise<Guia> {
     if (IS_MOCK) return mockGuiasService.refresh(id);
     const { data } = await apiClient.post<Guia>(`/guias/${id}/refresh`);

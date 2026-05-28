@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -13,9 +13,12 @@ import {
   RefreshCw,
   WifiOff,
   Activity,
+  MoreVertical,
+  XCircle,
+  Trash2,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useGuias, useRegistrarGuia } from '@/hooks/useGuias';
+import { useGuias, useRegistrarGuia, useCerrarGuia, useEliminarGuia } from '@/hooks/useGuias';
 import { useDashboard, DASHBOARD_POLL_MS } from '@/hooks/useDashboard';
 import { KPICard } from '@/components/features/dashboard/KPICard';
 import { ManualTrigger } from '@/components/features/dashboard/ManualTrigger';
@@ -30,12 +33,14 @@ const ESTADO_LABEL: Record<string, string> = {
   registrado: 'Registrada',
   recogido: 'Recogida',
   en_transito: 'En Despacho',
+  en_tcc: 'TCC',
   en_ruta_entrega: 'En Proceso De Entrega',
   entregado: 'Entregada',
   novedad: 'Novedad',
   devuelto: 'En Proceso De Devolución',
   fallido: 'No Entregada',
   cerrado: 'Cerrada',
+  reemplazado: 'Reemplazada',
   desconocido: 'Sin dato TCC',
 };
 
@@ -43,18 +48,20 @@ const ESTADO_COLOR: Record<string, string> = {
   registrado: 'bg-gray-100 text-gray-600',
   recogido: 'bg-blue-100 text-blue-700',
   en_transito: 'bg-yellow-100 text-yellow-700',
-  en_ruta_entrega: 'bg-blue-100 text-blue-700',
+  en_tcc: 'bg-cyan-100 text-cyan-700',
+  en_ruta_entrega: 'bg-indigo-100 text-indigo-700',
   entregado: 'bg-green-100 text-green-700',
   novedad: 'bg-red-100 text-red-700',
   devuelto: 'bg-orange-100 text-orange-700',
   fallido: 'bg-red-100 text-red-700',
   cerrado: 'bg-gray-100 text-gray-500',
+  reemplazado: 'bg-purple-100 text-purple-700',
   desconocido: 'bg-gray-100 text-gray-400',
 };
 
 const EN_RUTA = new Set(['registrado', 'recogido', 'en_transito', 'en_ruta_entrega']);
 
-type FilterKey = 'all' | 'en_ruta' | 'novedad' | 'sin_movimiento' | 'entregadas';
+type FilterKey = 'all' | 'en_ruta' | 'novedad' | 'sin_movimiento' | 'entregadas' | 'entregadas_hoy';
 type ChipTone = 'gray' | 'blue' | 'red' | 'amber' | 'green';
 
 const CHIP_ACTIVE: Record<ChipTone, string> = {
@@ -170,7 +177,35 @@ export default function DashboardPage() {
   }, [dataUpdatedAt]);
 
   const { mutateAsync, isPending } = useRegistrarGuia();
+  const { mutateAsync: cerrarGuia, isPending: cerrando } = useCerrarGuia();
+  const { mutateAsync: eliminarGuia, isPending: eliminando } = useEliminarGuia();
   const [apiError, setApiError] = useState<string | null>(null);
+
+  // Menú ••• y modal de confirmación
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<GuiaResumen | null>(null);
+  const menuRef = useRef<HTMLTableCellElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpenId(null);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  async function handleCerrar(g: GuiaResumen) {
+    setMenuOpenId(null);
+    await cerrarGuia(g.id);
+  }
+
+  async function handleEliminar() {
+    if (!confirmDelete) return;
+    await eliminarGuia(confirmDelete.id);
+    setConfirmDelete(null);
+  }
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -192,6 +227,7 @@ export default function DashboardPage() {
       novedad: 0,
       sin_movimiento: 0,
       entregadas: 0,
+      entregadas_hoy: 0,
     };
 
     const esSinMovimiento = (g: GuiaResumen): boolean => {
@@ -199,6 +235,7 @@ export default function DashboardPage() {
       const horas = (ahora - new Date(g.fecha_ultima_actualizacion).getTime()) / 3600000;
       return horas > HORAS_SIN_MOV;
     };
+    const esEntregada = (g: GuiaResumen): boolean => g.estado_actual === 'entregado';
     const esEntregadaHoy = (g: GuiaResumen): boolean => {
       if (g.estado_actual !== 'entregado' || !g.fecha_ultima_actualizacion) return false;
       return new Date(g.fecha_ultima_actualizacion).toDateString() === hoyStr;
@@ -208,7 +245,8 @@ export default function DashboardPage() {
       if (EN_RUTA.has(g.estado_actual)) c.en_ruta++;
       if (g.estado_actual === 'novedad') c.novedad++;
       if (esSinMovimiento(g)) c.sin_movimiento++;
-      if (esEntregadaHoy(g)) c.entregadas++;
+      if (esEntregada(g)) c.entregadas++;
+      if (esEntregadaHoy(g)) c.entregadas_hoy++;
     }
 
     const aplicaFiltro = (g: GuiaResumen): boolean => {
@@ -217,7 +255,8 @@ export default function DashboardPage() {
         case 'en_ruta': return EN_RUTA.has(g.estado_actual);
         case 'novedad': return g.estado_actual === 'novedad';
         case 'sin_movimiento': return esSinMovimiento(g);
-        case 'entregadas': return esEntregadaHoy(g);
+        case 'entregadas': return esEntregada(g);
+        case 'entregadas_hoy': return esEntregadaHoy(g);
       }
     };
 
@@ -283,8 +322,8 @@ export default function DashboardPage() {
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <button
             type="button"
-            onClick={() => setFiltro(filtro === 'entregadas' ? 'all' : 'entregadas')}
-            className={kpiBtnCn(filtro === 'entregadas', 'green')}
+            onClick={() => setFiltro(filtro === 'entregadas_hoy' ? 'all' : 'entregadas_hoy')}
+            className={kpiBtnCn(filtro === 'entregadas_hoy', 'green')}
           >
             <KPICard
               title="Entregadas hoy"
@@ -497,7 +536,10 @@ export default function DashboardPage() {
               Sin movimiento ({conteo.sin_movimiento})
             </ChipFilter>
             <ChipFilter active={filtro === 'entregadas'} onClick={() => setFiltro('entregadas')} tone="green">
-              Entregadas hoy ({conteo.entregadas})
+              Entregadas ({conteo.entregadas})
+            </ChipFilter>
+            <ChipFilter active={filtro === 'entregadas_hoy'} onClick={() => setFiltro('entregadas_hoy')} tone="green">
+              Entregadas hoy ({conteo.entregadas_hoy})
             </ChipFilter>
           </div>
 
@@ -523,6 +565,7 @@ export default function DashboardPage() {
                   <th className="px-4 py-3 text-left">Última actualización</th>
                   <th className="px-4 py-3 text-left">F. Despacho</th>
                   <th className="px-4 py-3 text-left">Días tránsito</th>
+                  <th className="px-2 py-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -561,6 +604,38 @@ export default function DashboardPage() {
                         ? `${g.dias_en_transito}d`
                         : <span className="text-gray-300">—</span>}
                     </td>
+
+                    {/* Menú ••• */}
+                    <td className="px-2 py-3 relative" ref={menuOpenId === g.id ? menuRef : null}>
+                      <button
+                        onClick={() => setMenuOpenId(menuOpenId === g.id ? null : g.id)}
+                        className="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </button>
+
+                      {menuOpenId === g.id && (
+                        <div className="absolute right-2 top-10 z-20 w-44 rounded-lg border border-gray-200 bg-white shadow-lg">
+                          {g.activa && (
+                            <button
+                              onClick={() => handleCerrar(g)}
+                              disabled={cerrando}
+                              className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 rounded-t-lg"
+                            >
+                              <XCircle className="h-4 w-4 text-gray-400" />
+                              Cerrar guía
+                            </button>
+                          )}
+                          <button
+                            onClick={() => { setMenuOpenId(null); setConfirmDelete(g); }}
+                            className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 rounded-b-lg"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Eliminar
+                          </button>
+                        </div>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -569,6 +644,38 @@ export default function DashboardPage() {
         </div>
 
       </div>
+
+      {/* Modal de confirmación de eliminación */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
+            <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-red-100">
+              <Trash2 className="h-5 w-5 text-red-600" />
+            </div>
+            <h3 className="text-base font-semibold text-gray-900">Eliminar guía</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              ¿Seguro que quieres eliminar la guía{' '}
+              <span className="font-mono font-semibold text-gray-800">{confirmDelete.numero_guia}</span>
+              {confirmDelete.cliente ? ` (${confirmDelete.cliente})` : ''}? Esta acción no se puede deshacer.
+            </p>
+            <div className="mt-5 flex gap-3">
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleEliminar}
+                disabled={eliminando}
+                className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {eliminando ? 'Eliminando...' : 'Sí, eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
