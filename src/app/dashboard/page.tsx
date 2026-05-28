@@ -148,7 +148,6 @@ const schema = z.object({
   numero_guia: z.string().min(1, 'Requerido').transform((v) => v.trim()),
   asesor: z.string().min(2, 'Mínimo 2 caracteres').transform((v) => v.trim()),
   cliente: z.string().optional().transform((v) => v?.trim() || undefined),
-  fecha_despacho: z.string().optional(),
 });
 type FormValues = z.input<typeof schema>;
 
@@ -287,7 +286,6 @@ export default function DashboardPage() {
         numero_guia: values.numero_guia,
         asesor: values.asesor,
         cliente: values.cliente,
-        fecha_despacho: values.fecha_despacho || undefined,
       });
       reset();
       setTimeout(() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.guias }), 10000);
@@ -460,7 +458,7 @@ export default function DashboardPage() {
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="mb-4 text-sm font-semibold text-gray-900">Ingresar guía</h2>
           <form onSubmit={handleSubmit(onSubmit)} noValidate>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-medium text-gray-700">
                   Guía <span className="text-red-500">*</span>
@@ -493,14 +491,6 @@ export default function DashboardPage() {
                   placeholder="Nombre del cliente"
                   className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   {...register('cliente')}
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-gray-700">Fecha despacho</label>
-                <input
-                  type="date"
-                  className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  {...register('fecha_despacho')}
                 />
               </div>
             </div>
