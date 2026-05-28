@@ -9,7 +9,6 @@ import {
   Truck,
   AlertTriangle,
   Package,
-  Clock3,
   RefreshCw,
   WifiOff,
   Activity,
@@ -62,7 +61,7 @@ const ESTADO_COLOR: Record<string, string> = {
 
 const EN_RUTA = new Set(['registrado', 'recogido', 'en_transito', 'en_ruta_entrega']);
 
-type FilterKey = 'all' | 'en_ruta' | 'novedad' | 'sin_movimiento' | 'entregadas' | 'entregadas_hoy';
+type FilterKey = 'all' | 'en_ruta' | 'novedad' | 'entregadas' | 'entregadas_hoy';
 type ChipTone = 'gray' | 'blue' | 'red' | 'amber' | 'green';
 
 const CHIP_ACTIVE: Record<ChipTone, string> = {
@@ -218,7 +217,6 @@ export default function DashboardPage() {
       all: guias.length,
       en_ruta: 0,
       novedad: 0,
-      sin_movimiento: 0,
       entregadas: 0,
       entregadas_hoy: 0,
     };
@@ -236,8 +234,8 @@ export default function DashboardPage() {
 
     for (const g of guias) {
       if (EN_RUTA.has(g.estado_actual)) c.en_ruta++;
-      if (g.estado_actual === 'novedad') c.novedad++;
-      if (esSinMovimiento(g)) c.sin_movimiento++;
+      // Sin movimiento se fusiona con novedad
+      if (g.estado_actual === 'novedad' || esSinMovimiento(g)) c.novedad++;
       if (esEntregada(g)) c.entregadas++;
       if (esEntregadaHoy(g)) c.entregadas_hoy++;
     }
@@ -253,7 +251,7 @@ export default function DashboardPage() {
         switch (filtro) {
           case 'all': return true;
           case 'en_ruta': return EN_RUTA.has(g.estado_actual);
-          case 'novedad': return g.estado_actual === 'novedad';
+          case 'novedad': return g.estado_actual === 'novedad' || esSinMovimiento(g);
           case 'sin_movimiento': return esSinMovimiento(g);
           case 'entregadas': return esEntregada(g);
           case 'entregadas_hoy': return esEntregadaHoy(g);
@@ -334,7 +332,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ── KPIs (clickeables como atajo de filtro) ── */}
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
           <button
             type="button"
             onClick={() => setFiltro(filtro === 'entregadas_hoy' ? 'all' : 'entregadas_hoy')}
@@ -368,22 +366,9 @@ export default function DashboardPage() {
           >
             <KPICard
               title="Con novedad"
-              value={stats?.con_novedad ?? 0}
+              value={conteo.novedad}
               icon={AlertTriangle}
               iconClassName="bg-red-50 text-red-600"
-              isLoading={isLoading}
-            />
-          </button>
-          <button
-            type="button"
-            onClick={() => setFiltro(filtro === 'sin_movimiento' ? 'all' : 'sin_movimiento')}
-            className={kpiBtnCn(filtro === 'sin_movimiento', 'amber')}
-          >
-            <KPICard
-              title="Sin movimiento"
-              value={stats?.sin_movimiento ?? 0}
-              icon={Clock3}
-              iconClassName="bg-amber-50 text-amber-600"
               isLoading={isLoading}
             />
           </button>
@@ -559,9 +544,6 @@ export default function DashboardPage() {
               </ChipFilter>
               <ChipFilter active={filtro === 'novedad'} onClick={() => setFiltro('novedad')} tone="red">
                 Con novedad ({conteo.novedad})
-              </ChipFilter>
-              <ChipFilter active={filtro === 'sin_movimiento'} onClick={() => setFiltro('sin_movimiento')} tone="amber">
-                Sin movimiento ({conteo.sin_movimiento})
               </ChipFilter>
               <ChipFilter active={filtro === 'entregadas'} onClick={() => setFiltro('entregadas')} tone="green">
                 Entregadas ({conteo.entregadas})
