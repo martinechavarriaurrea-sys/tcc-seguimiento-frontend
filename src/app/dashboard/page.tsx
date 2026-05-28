@@ -211,7 +211,6 @@ export default function DashboardPage() {
   const { guiasFiltradas, conteo, asesoresUnicos } = useMemo(() => {
     const ahora = Date.now();
     const hoyStr = new Date().toDateString();
-    const HORAS_SIN_MOV = 48;
 
     const c: Record<FilterKey, number> = {
       all: guias.length,
@@ -221,11 +220,6 @@ export default function DashboardPage() {
       entregadas_hoy: 0,
     };
 
-    const esSinMovimiento = (g: GuiaResumen): boolean => {
-      if (!g.activa || !g.fecha_ultima_actualizacion) return false;
-      const horas = (ahora - new Date(g.fecha_ultima_actualizacion).getTime()) / 3600000;
-      return horas > HORAS_SIN_MOV;
-    };
     // Guía demorada: activa, con fecha de despacho, >= 5 días desde despacho y sin entregar
     const esDemorada = (g: GuiaResumen): boolean => {
       if (!g.activa || !g.fecha_despacho || g.estado_actual === 'entregado') return false;
