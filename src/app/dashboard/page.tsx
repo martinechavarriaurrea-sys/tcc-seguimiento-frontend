@@ -16,6 +16,7 @@ import {
   MoreVertical,
   XCircle,
   User,
+  Flame,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useGuias, useRegistrarGuia, useCerrarGuia } from '@/hooks/useGuias';
@@ -592,8 +593,10 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {guiasFiltradas.map((g: GuiaResumen) => (
-                  <tr key={g.id} className="hover:bg-gray-50">
+                {guiasFiltradas.map((g: GuiaResumen) => {
+                  const diasAlerta = g.activa && g.dias_en_transito != null && g.dias_en_transito > 5;
+                  return (
+                  <tr key={g.id} className={diasAlerta ? 'row-alert' : 'hover:bg-gray-50'}>
                     <td className="px-6 py-3 font-mono font-medium text-gray-900">
                       {g.numero_guia}
                     </td>
@@ -627,10 +630,15 @@ export default function DashboardPage() {
                           })
                         : <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="px-4 py-3 text-gray-500">
-                      {g.dias_en_transito != null
-                        ? `${g.dias_en_transito}d`
-                        : <span className="text-gray-300">—</span>}
+                    <td className="px-4 py-3">
+                      {g.dias_en_transito != null ? (
+                        <span className={`inline-flex items-center gap-1 font-medium ${diasAlerta ? 'text-red-700' : 'text-gray-500'}`}>
+                          {diasAlerta && <Flame className="h-3.5 w-3.5 text-red-500" />}
+                          {g.dias_en_transito}d
+                        </span>
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
                     </td>
 
                     {/* Menú ••• */}
@@ -662,7 +670,8 @@ export default function DashboardPage() {
                       )}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           )}

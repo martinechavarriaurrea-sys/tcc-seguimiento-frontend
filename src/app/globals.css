@@ -25,3 +25,18 @@
     scrollbar-color: #d1d5db transparent;
   }
 }
+
+/* ── Alerta visual: guía con más de 5 días en tránsito ── */
+@keyframes row-alert-pulse {
+  0%, 100% { background-color: rgb(254 202 202); }   /* red-200 */
+  50%       { background-color: rgb(255 255 255); }   /* white   */
+}
+
+.row-alert {
+  animation: row-alert-pulse 1.4s ease-in-out infinite;
+}
+
+.row-alert:hover {
+  animation: none;
+  background-color: rgb(254 202 202);
+}
