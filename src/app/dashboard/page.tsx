@@ -538,29 +538,10 @@ export default function DashboardPage() {
             </span>
           </div>
 
-          {/* Chips de filtro + selector de asesor */}
-          <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 bg-gray-50 px-6 py-3">
-            <ChipFilter active={filtro === 'all'} onClick={() => setFiltro('all')}>
-              Todas ({conteo.all})
-            </ChipFilter>
-            <ChipFilter active={filtro === 'en_ruta'} onClick={() => setFiltro('en_ruta')} tone="blue">
-              En ruta ({conteo.en_ruta})
-            </ChipFilter>
-            <ChipFilter active={filtro === 'novedad'} onClick={() => setFiltro('novedad')} tone="red">
-              Con novedad ({conteo.novedad})
-            </ChipFilter>
-            <ChipFilter active={filtro === 'sin_movimiento'} onClick={() => setFiltro('sin_movimiento')} tone="amber">
-              Sin movimiento ({conteo.sin_movimiento})
-            </ChipFilter>
-            <ChipFilter active={filtro === 'entregadas'} onClick={() => setFiltro('entregadas')} tone="green">
-              Entregadas ({conteo.entregadas})
-            </ChipFilter>
-            <ChipFilter active={filtro === 'entregadas_hoy'} onClick={() => setFiltro('entregadas_hoy')} tone="green">
-              Entregadas hoy ({conteo.entregadas_hoy})
-            </ChipFilter>
-
-            {/* Selector de asesor */}
-            <div className="ml-auto flex items-center gap-1.5">
+          {/* Filtros: asesor arriba, chips abajo */}
+          <div className="flex flex-col border-b border-gray-100 bg-gray-50">
+            {/* Fila 1 — Selector de asesor */}
+            <div className="flex items-center gap-1.5 px-6 py-2.5 border-b border-gray-100">
               <User className="h-3.5 w-3.5 text-gray-400 shrink-0" />
               <select
                 value={filtroAsesor}
@@ -576,6 +557,28 @@ export default function DashboardPage() {
                   <option key={a} value={a}>{a}</option>
                 ))}
               </select>
+            </div>
+
+            {/* Fila 2 — Chips de filtro por estado */}
+            <div className="flex flex-wrap items-center gap-2 px-6 py-3">
+              <ChipFilter active={filtro === 'all'} onClick={() => setFiltro('all')}>
+                Todas ({conteo.all})
+              </ChipFilter>
+              <ChipFilter active={filtro === 'en_ruta'} onClick={() => setFiltro('en_ruta')} tone="blue">
+                En ruta ({conteo.en_ruta})
+              </ChipFilter>
+              <ChipFilter active={filtro === 'novedad'} onClick={() => setFiltro('novedad')} tone="red">
+                Con novedad ({conteo.novedad})
+              </ChipFilter>
+              <ChipFilter active={filtro === 'sin_movimiento'} onClick={() => setFiltro('sin_movimiento')} tone="amber">
+                Sin movimiento ({conteo.sin_movimiento})
+              </ChipFilter>
+              <ChipFilter active={filtro === 'entregadas'} onClick={() => setFiltro('entregadas')} tone="green">
+                Entregadas ({conteo.entregadas})
+              </ChipFilter>
+              <ChipFilter active={filtro === 'entregadas_hoy'} onClick={() => setFiltro('entregadas_hoy')} tone="green">
+                Entregadas hoy ({conteo.entregadas_hoy})
+              </ChipFilter>
             </div>
           </div>
 
