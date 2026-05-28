@@ -226,6 +226,8 @@ export default function DashboardPage() {
       const horas = (ahora - new Date(g.fecha_ultima_actualizacion).getTime()) / 3600000;
       return horas > HORAS_SIN_MOV;
     };
+    const esEntregaRetrasada = (g: GuiaResumen): boolean =>
+      g.activa && g.estado_actual === 'en_ruta_entrega' && (g.dias_en_transito ?? 0) > 5;
     const esEntregada = (g: GuiaResumen): boolean => g.estado_actual === 'entregado';
     const esEntregadaHoy = (g: GuiaResumen): boolean => {
       if (g.estado_actual !== 'entregado' || !g.fecha_ultima_actualizacion) return false;
@@ -234,8 +236,8 @@ export default function DashboardPage() {
 
     for (const g of guias) {
       if (EN_RUTA.has(g.estado_actual)) c.en_ruta++;
-      // Sin movimiento se fusiona con novedad
-      if (g.estado_actual === 'novedad' || esSinMovimiento(g)) c.novedad++;
+      // Sin movimiento y entrega retrasada (+5d) se fusionan con novedad
+      if (g.estado_actual === 'novedad' || esSinMovimiento(g) || esEntregaRetrasada(g)) c.novedad++;
       if (esEntregada(g)) c.entregadas++;
       if (esEntregadaHoy(g)) c.entregadas_hoy++;
     }
@@ -251,7 +253,7 @@ export default function DashboardPage() {
         switch (filtro) {
           case 'all': return true;
           case 'en_ruta': return EN_RUTA.has(g.estado_actual);
-          case 'novedad': return g.estado_actual === 'novedad' || esSinMovimiento(g);
+          case 'novedad': return g.estado_actual === 'novedad' || esSinMovimiento(g) || esEntregaRetrasada(g);
           case 'sin_movimiento': return esSinMovimiento(g);
           case 'entregadas': return esEntregada(g);
           case 'entregadas_hoy': return esEntregadaHoy(g);
