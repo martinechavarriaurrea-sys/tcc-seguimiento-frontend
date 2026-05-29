@@ -21,7 +21,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useGuias, useRegistrarGuia, useCerrarGuia } from '@/hooks/useGuias';
 import { useDashboard, DASHBOARD_POLL_MS } from '@/hooks/useDashboard';
 import { KPICard } from '@/components/features/dashboard/KPICard';
-import { ManualTrigger } from '@/components/features/dashboard/ManualTrigger';
 import { PdfDownloadPanel } from '@/components/features/dashboard/PdfDownloadPanel';
 import { extractApiErrorMessage, formatDateTime, formatRelative } from '@/utils/format';
 import { QUERY_KEYS } from '@/lib/constants';
@@ -497,8 +496,6 @@ export default function DashboardPage() {
             </div>
           </form>
         </div>
-
-        <ManualTrigger />
 
         <PdfDownloadPanel />
 
