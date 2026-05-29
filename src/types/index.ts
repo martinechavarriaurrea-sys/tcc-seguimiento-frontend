@@ -49,6 +49,7 @@ export interface GuiaResumen {
   numero_guia: string;
   asesor: string;
   cliente?: string;
+  numero_remision?: string | null;
   estado_actual: EstadoGuia;
   estado_raw?: string | null;
   fecha_ultima_actualizacion: string;
@@ -62,6 +63,7 @@ export interface RegistrarGuiaPayload {
   numero_guia: string;
   asesor: string;
   cliente?: string;
+  numero_remision?: string;
   fecha_despacho?: string;
 }
 
