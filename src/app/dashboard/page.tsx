@@ -15,6 +15,7 @@ import {
   XCircle,
   User,
   Flame,
+  CalendarRange,
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useGuias, useRegistrarGuia, useCerrarGuia } from '@/hooks/useGuias';
@@ -171,6 +172,8 @@ export default function DashboardPage() {
   // ── Filtros ───────────────────────────────────────────────────────────────
   const [filtro, setFiltro] = useState<FilterKey>('all');
   const [filtroAsesor, setFiltroAsesor] = useState<string>('');
+  const [filtroDesde, setFiltroDesde] = useState<string>('');
+  const [filtroHasta, setFiltroHasta] = useState<string>('');
 
   const { guiasFiltradas, conteo, asesoresUnicos } = useMemo(() => {
     const ahora = Date.now();
@@ -222,7 +225,16 @@ export default function DashboardPage() {
       })();
       // Filtro por asesor (AND con chip)
       const pasaAsesor = filtroAsesor === '' || g.asesor === filtroAsesor;
-      return pasaChip && pasaAsesor;
+      // Filtro por rango de fecha de despacho (AND con los anteriores)
+      const pasaFecha = (() => {
+        if (!filtroDesde && !filtroHasta) return true;
+        if (!g.fecha_despacho) return false;
+        const fecha = g.fecha_despacho; // ya viene como YYYY-MM-DD
+        if (filtroDesde && fecha < filtroDesde) return false;
+        if (filtroHasta && fecha > filtroHasta) return false;
+        return true;
+      })();
+      return pasaChip && pasaAsesor && pasaFecha;
     };
 
     const esAlerta = (g: GuiaResumen) =>
@@ -238,7 +250,7 @@ export default function DashboardPage() {
     });
 
     return { guiasFiltradas: filtradas, conteo: c, asesoresUnicos };
-  }, [guias, filtro, filtroAsesor]);
+  }, [guias, filtro, filtroAsesor, filtroDesde, filtroHasta]);
 
   async function onSubmit(values: FormValues) {
     setApiError(null);
@@ -420,23 +432,64 @@ export default function DashboardPage() {
 
           {/* Filtros: asesor arriba, chips abajo */}
           <div className="flex flex-col border-b border-gray-100 bg-gray-50">
-            {/* Fila 1 — Selector de asesor */}
-            <div className="flex items-center gap-1.5 px-6 py-2.5 border-b border-gray-100">
-              <User className="h-3.5 w-3.5 text-gray-400 shrink-0" />
-              <select
-                value={filtroAsesor}
-                onChange={(e) => setFiltroAsesor(e.target.value)}
-                className={`rounded-full border py-1.5 pl-2.5 pr-7 text-xs font-medium transition appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-300 ${
-                  filtroAsesor
-                    ? 'border-blue-400 bg-blue-600 text-white'
-                    : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                <option value="">Todos los asesores</option>
-                {asesoresUnicos.map((a) => (
-                  <option key={a} value={a}>{a}</option>
-                ))}
-              </select>
+            {/* Fila 1 — Asesor + rango de fechas */}
+            <div className="flex flex-wrap items-center gap-3 px-6 py-2.5 border-b border-gray-100">
+              {/* Selector asesor */}
+              <div className="flex items-center gap-1.5">
+                <User className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                <select
+                  value={filtroAsesor}
+                  onChange={(e) => setFiltroAsesor(e.target.value)}
+                  className={`rounded-full border py-1.5 pl-2.5 pr-7 text-xs font-medium transition appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-300 ${
+                    filtroAsesor
+                      ? 'border-blue-400 bg-blue-600 text-white'
+                      : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <option value="">Todos los asesores</option>
+                  {asesoresUnicos.map((a) => (
+                    <option key={a} value={a}>{a}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Separador */}
+              <div className="h-4 w-px bg-gray-200 shrink-0" />
+
+              {/* Rango de fecha de despacho */}
+              <div className="flex items-center gap-1.5">
+                <CalendarRange className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                <input
+                  type="date"
+                  value={filtroDesde}
+                  onChange={(e) => setFiltroDesde(e.target.value)}
+                  className={`rounded-full border py-1.5 px-2.5 text-xs font-medium transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-300 ${
+                    filtroDesde
+                      ? 'border-blue-400 bg-blue-600 text-white [color-scheme:dark]'
+                      : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                  }`}
+                />
+                <span className="text-xs text-gray-400">—</span>
+                <input
+                  type="date"
+                  value={filtroHasta}
+                  onChange={(e) => setFiltroHasta(e.target.value)}
+                  className={`rounded-full border py-1.5 px-2.5 text-xs font-medium transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-300 ${
+                    filtroHasta
+                      ? 'border-blue-400 bg-blue-600 text-white [color-scheme:dark]'
+                      : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                  }`}
+                />
+                {(filtroDesde || filtroHasta) && (
+                  <button
+                    type="button"
+                    onClick={() => { setFiltroDesde(''); setFiltroHasta(''); }}
+                    className="rounded-full border border-gray-200 bg-white px-2 py-1 text-xs text-gray-400 hover:bg-gray-50 hover:text-gray-600 transition"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Fila 2 — Chips de filtro por estado */}
