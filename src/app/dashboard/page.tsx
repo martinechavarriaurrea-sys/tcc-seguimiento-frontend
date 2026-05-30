@@ -9,7 +9,6 @@ import {
   Truck,
   AlertTriangle,
   Package,
-  RefreshCw,
   WifiOff,
   Activity,
   MoreVertical,
@@ -19,10 +18,10 @@ import {
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useGuias, useRegistrarGuia, useCerrarGuia } from '@/hooks/useGuias';
-import { useDashboard, DASHBOARD_POLL_MS } from '@/hooks/useDashboard';
+import { useDashboard } from '@/hooks/useDashboard';
 import { KPICard } from '@/components/features/dashboard/KPICard';
 import { PdfDownloadPanel } from '@/components/features/dashboard/PdfDownloadPanel';
-import { extractApiErrorMessage, formatDateTime, formatRelative } from '@/utils/format';
+import { extractApiErrorMessage, formatRelative } from '@/utils/format';
 import { QUERY_KEYS } from '@/lib/constants';
 import type { GuiaResumen } from '@/types';
 
@@ -116,30 +115,6 @@ function kpiBtnCn(active: boolean, tone: ChipTone): string {
   }`;
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-
-function formatCycle(isoStr: string | null | undefined): string {
-  if (!isoStr) return '—';
-  try {
-    const d = new Date(isoStr);
-    const h = d.getUTCHours() - 5; // UTC-5 Bogotá
-    const norm = ((h % 24) + 24) % 24;
-    if (norm === 7) return '07:00';
-    if (norm === 12) return '12:00';
-    if (norm === 16) return '16:00';
-    return formatDateTime(isoStr);
-  } catch {
-    return '—';
-  }
-}
-
-function secsToLabel(secs: number): string {
-  if (secs < 5) return 'ahora mismo';
-  if (secs < 60) return `hace ${secs}s`;
-  const m = Math.floor(secs / 60);
-  return `hace ${m}m`;
-}
-
 // ── Formulario ─────────────────────────────────────────────────────────────
 
 const schema = z.object({
@@ -158,22 +133,11 @@ export default function DashboardPage() {
   // Guías list — also polls every 60s to stay fresh
   const { data, isLoading } = useGuias({ page_size: 200 });
 
-  // Dashboard stats — polls every 60s, exposes last fetch time
+  // Dashboard stats — polls every 60s
   const {
     data: stats,
     isError: statsError,
-    dataUpdatedAt,
   } = useDashboard();
-
-  // "Actualizado hace X segundos" counter
-  const [secsAgo, setSecsAgo] = useState(0);
-  useEffect(() => {
-    if (!dataUpdatedAt) return;
-    const tick = () => setSecsAgo(Math.floor((Date.now() - dataUpdatedAt) / 1000));
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [dataUpdatedAt]);
 
   const { mutateAsync, isPending } = useRegistrarGuia();
   const { mutateAsync: cerrarGuia, isPending: cerrando } = useCerrarGuia();
@@ -372,71 +336,6 @@ export default function DashboardPage() {
               isLoading={isLoading}
             />
           </button>
-        </div>
-
-        {/* ── Estado del ciclo + indicador de polling ── */}
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
-                <RefreshCw className="h-4 w-4" />
-              </div>
-              <div>
-                <h2 className="text-sm font-semibold text-gray-900">Estado de ejecución</h2>
-                <p className="text-xs text-gray-500">GitHub Actions · ciclos 07:00, 12:00, 16:00</p>
-              </div>
-            </div>
-
-            {/* Indicador de última actualización */}
-            <div className="flex items-center gap-1.5 text-xs text-gray-400">
-              <span
-                className={`h-2 w-2 rounded-full ${
-                  statsError ? 'bg-red-400' : 'bg-green-400 animate-pulse'
-                }`}
-              />
-              {statsError
-                ? 'Sin conexión — mostrando último estado'
-                : `Actualizado ${secsToLabel(secsAgo)} · refresca cada ${DASHBOARD_POLL_MS / 1000}s`}
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
-              <p className="text-xs text-gray-500">Último ciclo ejecutado</p>
-              <p className="mt-1 text-sm font-semibold text-gray-900">
-                {stats?.ultima_ejecucion ? formatDateTime(stats.ultima_ejecucion) : 'Sin registros'}
-              </p>
-              {stats?.ultima_ejecucion && (
-                <p className="mt-0.5 text-xs text-gray-400">
-                  Ciclo {formatCycle(stats.ultima_ejecucion)} · {formatRelative(stats.ultima_ejecucion)}
-                </p>
-              )}
-            </div>
-
-            <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
-              <p className="text-xs text-gray-500">Próximo ciclo programado</p>
-              <p className="mt-1 text-sm font-semibold text-gray-900">
-                {stats?.proxima_ejecucion ? formatDateTime(stats.proxima_ejecucion) : '—'}
-              </p>
-              {stats?.proxima_ejecucion && (
-                <p className="mt-0.5 text-xs text-gray-400">
-                  Ciclo {formatCycle(stats.proxima_ejecucion)}
-                </p>
-              )}
-            </div>
-
-            <div className="rounded-lg border border-gray-100 bg-gray-50 p-4">
-              <p className="text-xs text-gray-500">Guías activas monitoreadas</p>
-              <p className="mt-1 text-2xl font-bold text-gray-900">
-                {stats?.total_guias_activas ?? '—'}
-              </p>
-              {stats?.guias_activas?.length != null && (
-                <p className="mt-0.5 text-xs text-gray-400">
-                  {stats.guias_activas.filter((g) => g.estado_actual === 'novedad').length} con novedad
-                </p>
-              )}
-            </div>
-          </div>
         </div>
 
         {/* ── Formulario ── */}
